@@ -15,9 +15,11 @@ from andoguard.models import (
     ApkDiffResult,
     ApkFileEntry,
     CodeResult,
+    DeviceInfo,
     DisasmResult,
     ElfInfo,
     ManifestData,
+    ProcessInfo,
     ResourceEntry,
     SearchResultItem,
     SecretFinding,
@@ -25,6 +27,7 @@ from andoguard.models import (
     SignatureReport,
     StringItem,
     TargetInfo,
+    TraceEvent,
     VulnerabilityReport,
     XrefResult,
 )
@@ -760,4 +763,72 @@ def render_search(
         console.print(
             f"[dim]... and {len(results) - 100} more results (use --json for all).[/dim]"
         )
+
+
+def render_devices(devices: list[DeviceInfo], as_json: bool = False) -> None:
+    """Render list of connected devices and emulators."""
+    if as_json:
+        print(json.dumps([d.model_dump() for d in devices], indent=2))
+        return
+
+    if not devices:
+        console.print("[yellow]No Android devices or emulators detected.[/yellow]")
+        return
+
+    table = Table(
+        title=f"Connected Devices ({len(devices)})",
+        show_header=True,
+        header_style="bold green",
+    )
+    table.add_column("Device ID", style="cyan", width=22)
+    table.add_column("Name", style="white")
+    table.add_column("Type", style="yellow", width=10)
+    table.add_column("Emulator", style="magenta", width=10)
+
+    for d in devices:
+        table.add_row(
+            d.id, d.name, d.device_type, "Yes" if d.is_emulator else "No"
+        )
+    console.print(table)
+
+
+def render_processes(processes: list[ProcessInfo], as_json: bool = False) -> None:
+    """Render list of running processes on device."""
+    if as_json:
+        print(json.dumps([p.model_dump() for p in processes], indent=2))
+        return
+
+    if not processes:
+        console.print("[yellow]No running processes found.[/yellow]")
+        return
+
+    table = Table(
+        title=f"Running Processes ({len(processes)})",
+        show_header=True,
+        header_style="bold blue",
+    )
+    table.add_column("PID", style="yellow", justify="right", width=8)
+    table.add_column("Process / Package Name", style="white")
+
+    for p in processes:
+        table.add_row(str(p.pid), p.name)
+    console.print(table)
+
+
+def render_trace_event(event: TraceEvent) -> None:
+    """Render a single real-time method trace event."""
+    if event.event_type == "call" or event.event_type == "trace_call":
+        args_str = ", ".join(event.args)
+        console.print(
+            f"[dim]{event.timestamp}[/dim] [bold green]CALL[/bold green] [cyan]{event.class_name}[/cyan].[bold yellow]{event.method_name}[/bold yellow]({args_str})"
+        )
+    elif event.event_type == "return" or event.event_type == "trace_return":
+        console.print(
+            f"[dim]{event.timestamp}[/dim] [bold magenta]RET [/bold magenta] [cyan]{event.class_name}[/cyan].[bold yellow]{event.method_name}[/bold yellow] -> [bold white]{event.return_val}[/bold white]"
+        )
+    else:
+        console.print(
+            f"[dim]{event.timestamp}[/dim] [blue]{event.event_type.upper()}[/blue] {event.class_name}.{event.method_name}"
+        )
+
 

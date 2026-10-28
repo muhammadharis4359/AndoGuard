@@ -5,6 +5,7 @@ from andoguard.cli.commands.classes_cmd import show_classes
 from andoguard.cli.commands.code_cmd import show_code
 from andoguard.cli.commands.diff_cmd import show_diff
 from andoguard.cli.commands.disasm_cmd import show_disasm
+from andoguard.cli.commands.dynamic_cmd import dynamic_app
 from andoguard.cli.commands.files_cmd import show_files
 from andoguard.cli.commands.info_cmd import show_info
 from andoguard.cli.commands.manifest_cmd import show_manifest
@@ -39,4 +40,5 @@ __all__ = [
     "show_vulns",
     "show_native",
     "show_diff",
+    "dynamic_app",
 ]

@@ -385,3 +385,42 @@ class ApkDiffResult(BaseModel):
     removed_components: list[str] = Field(default_factory=list)
 
 
+class DeviceInfo(BaseModel):
+    """Android device or emulator descriptor."""
+
+    id: str
+    name: str
+    device_type: str = "usb"
+    is_emulator: bool = False
+
+
+class ProcessInfo(BaseModel):
+    """Running Android process information."""
+
+    pid: int
+    name: str
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class TraceEvent(BaseModel):
+    """Dynamic method call or memory trace event."""
+
+    timestamp: str
+    event_type: str = "call"
+    class_name: str = ""
+    method_name: str = ""
+    args: list[str] = Field(default_factory=list)
+    return_val: str | None = None
+    thread_id: int | None = None
+
+
+class HookResult(BaseModel):
+    """Dynamic hook installation result."""
+
+    hook_id: str
+    target: str
+    status: str = "injected"
+    script: str = ""
+
+
+

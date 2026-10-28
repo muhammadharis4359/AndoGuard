@@ -6,6 +6,12 @@ from typing import Any
 from andoguard.adapters.backend import BackendAdapter
 from andoguard.adapters.detect import create_backend
 from andoguard.config import AndoGuardConfig
+from andoguard.dynamic.generator import (
+    generate_java_class_hook,
+    generate_java_method_hook,
+    generate_native_hook,
+)
+from andoguard.dynamic.tracer import generate_pattern_tracer_script
 from andoguard.errors import (
     SessionNotFoundError,
     TargetNotFoundError,
@@ -17,11 +23,13 @@ from andoguard.models import (
     ApkFileEntry,
     ClassDetail,
     CodeResult,
+    DeviceInfo,
     DisasmResult,
     ElfInfo,
     ManifestComponent,
     ManifestData,
     ManifestSecurityFlags,
+    ProcessInfo,
     ResourceEntry,
     SearchResultItem,
     SecretFinding,
@@ -339,6 +347,100 @@ class AndoGuard:
                 query, session_id=self.session_record.session_id
             )
         return results
+
+    def devices(self, simulation_mode: bool = False) -> list[DeviceInfo]:
+        """List connected Android devices and emulators."""
+        from andoguard.adapters.frida_bridge import FridaBridge
+
+        bridge = FridaBridge(simulation_mode=simulation_mode)
+        return bridge.get_devices()
+
+    def processes(
+        self, device_id: str | None = None, simulation_mode: bool = False
+    ) -> list[ProcessInfo]:
+        """List running processes on connected device."""
+        from andoguard.adapters.frida_bridge import FridaBridge
+
+        bridge = FridaBridge(simulation_mode=simulation_mode)
+        return bridge.list_processes(device_id=device_id)
+
+    def spawn(
+        self,
+        package_name: str | None = None,
+        device_id: str | None = None,
+        auto_resume: bool = False,
+        simulation_mode: bool = False,
+    ) -> int:
+        """Spawn target package on connected device."""
+        from andoguard.adapters.frida_bridge import FridaBridge
+
+        pkg = package_name or self.target_info.package_name or "com.example.target"
+        bridge = FridaBridge(simulation_mode=simulation_mode)
+        return bridge.spawn(pkg, device_id=device_id, auto_resume=auto_resume)
+
+    def attach(
+        self,
+        target: int | str | None = None,
+        device_id: str | None = None,
+        simulation_mode: bool = False,
+    ) -> Any:
+        """Attach to running target process on connected device."""
+        from andoguard.adapters.frida_bridge import FridaBridge
+
+        tgt = target or self.target_info.package_name or "com.example.target"
+        bridge = FridaBridge(simulation_mode=simulation_mode)
+        return bridge.attach(tgt, device_id=device_id)
+
+    def resume_process(
+        self, pid: int, device_id: str | None = None, simulation_mode: bool = False
+    ) -> None:
+        """Resume execution of a spawned target process."""
+        from andoguard.adapters.frida_bridge import FridaBridge
+
+        bridge = FridaBridge(simulation_mode=simulation_mode)
+        bridge.resume(pid, device_id=device_id)
+
+    def kill_process(
+        self, pid: int, device_id: str | None = None, simulation_mode: bool = False
+    ) -> None:
+        """Kill a running process on target device."""
+        from andoguard.adapters.frida_bridge import FridaBridge
+
+        bridge = FridaBridge(simulation_mode=simulation_mode)
+        bridge.kill(pid, device_id=device_id)
+
+    def generate_hook(
+        self,
+        target: str,
+        custom_return: str | None = None,
+        dump_backtrace: bool = True,
+        native: bool = False,
+        library: str | None = None,
+    ) -> str:
+        """Generate Frida hook script for a Java method or native C/C++ function."""
+        if native:
+            return generate_native_hook(target, library_name=library)
+        if "#" in target:
+            cls_name, meth_name = target.split("#", 1)
+            return generate_java_method_hook(
+                cls_name,
+                meth_name,
+                dump_backtrace=dump_backtrace,
+                custom_return=custom_return,
+            )
+        if "->" in target:
+            cls_name, meth_name = target.split("->", 1)
+            return generate_java_method_hook(
+                cls_name,
+                meth_name,
+                dump_backtrace=dump_backtrace,
+                custom_return=custom_return,
+            )
+        return generate_java_class_hook(target)
+
+    def generate_tracer(self, pattern: str) -> str:
+        """Generate Frida tracing script matching class or method pattern."""
+        return generate_pattern_tracer_script(pattern)
 
     def close(self) -> None:
         """Release open file handles and shutdown backend workers."""

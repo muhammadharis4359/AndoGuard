@@ -100,3 +100,49 @@ class ConcurrencyError(AndoGuardError):
 
 class ConfigurationError(AndoGuardError):
     """Raised when configuration validation or loading fails."""
+
+
+class DynamicInstrumentationError(AndoGuardError):
+    """Base exception for Frida and dynamic runtime instrumentation failures."""
+
+
+class FridaUnavailableError(DynamicInstrumentationError):
+    """Raised when Frida is not installed or frida-server is unreachable."""
+
+    def __init__(self, details: str = "Frida runtime is not available.") -> None:
+        super().__init__(
+            message=f"Frida bridge failure: {details}",
+            remediation="Install frida with 'pip install frida frida-tools' and ensure frida-server is running on device.",
+        )
+
+
+class DeviceNotFoundError(DynamicInstrumentationError):
+    """Raised when the specified target device or emulator is not connected."""
+
+    def __init__(self, device_id: str | None = None) -> None:
+        dev_msg = f"'{device_id}'" if device_id else "any USB or emulator device"
+        super().__init__(
+            message=f"No connected Android device found matching {dev_msg}.",
+            remediation="Connect device via USB with ADB debugging enabled or run 'adb devices'.",
+        )
+
+
+class ProcessNotFoundError(DynamicInstrumentationError):
+    """Raised when target process or package cannot be found on device."""
+
+    def __init__(self, target: str) -> None:
+        super().__init__(
+            message=f"Process or package '{target}' not found running on device.",
+            remediation="Verify package name or spawn it with 'andoguard dynamic spawn <package>'.",
+        )
+
+
+class HookError(DynamicInstrumentationError):
+    """Raised when hook script compilation or injection fails."""
+
+    def __init__(self, message: str, script: str | None = None) -> None:
+        super().__init__(
+            message=f"Hook injection failed: {message}",
+            remediation="Review hook script syntax, class/method names, and parameters.",
+        )
+
