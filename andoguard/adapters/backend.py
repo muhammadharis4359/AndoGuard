@@ -20,6 +20,7 @@ from andoguard.models import (
     SignatureReport,
     StringItem,
     TargetInfo,
+    XrefResult,
 )
 
 T = TypeVar("T")
@@ -250,4 +251,9 @@ class BackendAdapter(ABC):
         cfg: bool = False,
     ) -> CodeResult:
         """Decompile Dalvik bytecode to Java/Dalvik source with optional CFG."""
+
+    @abstractmethod
+    def get_xrefs(self, target: str, direction: str = "both") -> XrefResult:
+        """Extract cross-references (callers/callees) for a class, method, or string."""
+
 

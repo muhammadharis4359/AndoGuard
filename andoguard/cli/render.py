@@ -12,15 +12,21 @@ from rich.text import Text
 
 from andoguard.errors import AndoGuardError
 from andoguard.models import (
+    ApkDiffResult,
     ApkFileEntry,
     CodeResult,
     DisasmResult,
+    ElfInfo,
     ManifestData,
     ResourceEntry,
+    SearchResultItem,
+    SecretFinding,
     SessionRecord,
     SignatureReport,
     StringItem,
     TargetInfo,
+    VulnerabilityReport,
+    XrefResult,
 )
 
 console = Console()
@@ -544,3 +550,214 @@ def render_code(result: CodeResult, as_json: bool = False) -> None:
         console.print(table)
         console.print("\n[dim]DOT Graph specification:[/dim]")
         console.print(Syntax(result.cfg.dot, "dot", theme="monokai"))
+
+
+def render_xrefs(result: XrefResult, as_json: bool = False) -> None:
+    """Render cross-references (callers/callees)."""
+    if as_json:
+        print(json.dumps(result.model_dump(), indent=2))
+        return
+
+    console.print(f"[bold cyan]Cross-References for:[/bold cyan] {result.target}")
+    if result.xrefs_to:
+        to_table = Table(
+            title=f"Callers / Referenced By (xrefs-to: {len(result.xrefs_to)})",
+            show_header=True,
+            header_style="bold yellow",
+        )
+        to_table.add_column("Caller", style="white")
+        to_table.add_column("Type", style="cyan", width=10)
+        to_table.add_column("Offset", style="dim", width=10)
+        for x in result.xrefs_to:
+            off_str = f"0x{x.offset:x}" if x.offset is not None else "-"
+            to_table.add_row(x.caller, x.call_type, off_str)
+        console.print(to_table)
+    else:
+        console.print("[dim]No callers (xrefs-to) found.[/dim]")
+
+    if result.xrefs_from:
+        from_table = Table(
+            title=f"Callees / References Out (xrefs-from: {len(result.xrefs_from)})",
+            show_header=True,
+            header_style="bold green",
+        )
+        from_table.add_column("Callee", style="white")
+        from_table.add_column("Type", style="cyan", width=10)
+        from_table.add_column("Offset", style="dim", width=10)
+        for x in result.xrefs_from:
+            off_str = f"0x{x.offset:x}" if x.offset is not None else "-"
+            from_table.add_row(x.callee, x.call_type, off_str)
+        console.print(from_table)
+    else:
+        console.print("[dim]No outgoing references (xrefs-from) found.[/dim]")
+
+
+def render_secrets(secrets: list[SecretFinding], as_json: bool = False) -> None:
+    """Render discovered credentials and high-entropy secrets."""
+    if as_json:
+        print(json.dumps([s.model_dump() for s in secrets], indent=2))
+        return
+
+    if not secrets:
+        console.print("[green]No secrets or high-entropy tokens detected.[/green]")
+        return
+
+    table = Table(
+        title=f"Discovered Secrets & Credentials ({len(secrets)})",
+        show_header=True,
+        header_style="bold red",
+    )
+    table.add_column("Type", style="yellow", width=22)
+    table.add_column("Entropy", style="magenta", justify="right", width=9)
+    table.add_column("Source", style="cyan", width=12)
+    table.add_column("Value Snippet", style="white")
+
+    for s in secrets:
+        val_disp = s.value if len(s.value) <= 60 else s.value[:57] + "..."
+        table.add_row(s.secret_type, f"{s.entropy:.2f}", s.source_file, val_disp)
+    console.print(table)
+
+
+def render_vulns(report: VulnerabilityReport, as_json: bool = False) -> None:
+    """Render OWASP MASVS vulnerability assessment report."""
+    if as_json:
+        print(json.dumps(report.model_dump(), indent=2))
+        return
+
+    console.print(f"[bold red]OWASP MASVS Audit Report for:[/bold red] {report.target}\n")
+
+    summary_table = Table(
+        title="Findings Summary", show_header=True, header_style="bold blue"
+    )
+    summary_table.add_column("Severity", style="white", width=12)
+    summary_table.add_column("Count", style="cyan", justify="right", width=8)
+
+    sev_colors = {
+        "CRITICAL": "bold red",
+        "HIGH": "red",
+        "MEDIUM": "yellow",
+        "LOW": "blue",
+        "INFO": "dim",
+    }
+    for sev, count in report.summary.items():
+        c = sev_colors.get(sev, "white")
+        summary_table.add_row(f"[{c}]{sev}[/{c}]", str(count))
+    console.print(summary_table)
+
+    if not report.findings:
+        console.print("\n[green]No MASVS security weaknesses identified.[/green]")
+        return
+
+    for idx, f in enumerate(report.findings, start=1):
+        c = sev_colors.get(f.severity.value, "white")
+        p = Panel(
+            f"[bold]MASVS Category:[/bold] {f.masvs_id}\n"
+            f"[bold]Location:[/bold] {f.location}\n\n"
+            f"[bold]Description:[/bold] {f.description}\n\n"
+            f"[bold green]Remediation:[/bold green] {f.remediation}",
+            title=f"#{idx} [{c}][{f.severity.value}] {f.title}[/{c}]",
+            border_style=c,
+        )
+        console.print(p)
+
+
+def render_native(libs: list[ElfInfo], as_json: bool = False) -> None:
+    """Render native library ELF architecture and symbol analysis."""
+    if as_json:
+        print(json.dumps([lib.model_dump() for lib in libs], indent=2))
+        return
+
+    if not libs:
+        console.print("[yellow]No native ELF shared libraries found.[/yellow]")
+        return
+
+    table = Table(
+        title=f"Native Shared Libraries ({len(libs)})",
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Library Path", style="white")
+    table.add_column("Arch", style="cyan", width=10)
+    table.add_column("Bits", style="yellow", justify="right", width=6)
+    table.add_column("Dependencies", style="green")
+    table.add_column("JNI Exports", style="magenta", justify="right", width=12)
+
+    for lib_info in libs:
+        deps_str = ", ".join(lib_info.needed_libs[:3])
+        if len(lib_info.needed_libs) > 3:
+            deps_str += f" (+{len(lib_info.needed_libs) - 3})"
+        table.add_row(
+            lib_info.path,
+            lib_info.arch,
+            f"{lib_info.bits}-bit",
+            deps_str or "-",
+            str(len(lib_info.jni_exports)),
+        )
+    console.print(table)
+
+
+def render_diff(result: ApkDiffResult, as_json: bool = False) -> None:
+    """Render structural comparison diff between two targets."""
+    if as_json:
+        print(json.dumps(result.model_dump(), indent=2))
+        return
+
+    table = Table(
+        title=f"Structural Diff:\n[dim]A: {result.target_a}[/dim]\n[dim]B: {result.target_b}[/dim]",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Category", style="yellow", width=16)
+    table.add_column("Difference", style="white")
+
+    def _add_diff_rows(category: str, added: list[str], removed: list[str]) -> None:
+        if not added and not removed:
+            table.add_row(category, "[dim]No changes[/dim]")
+            return
+        diffs = []
+        for a in added[:10]:
+            diffs.append(f"[green]+ {a}[/green]")
+        if len(added) > 10:
+            diffs.append(f"[dim]+ {len(added) - 10} more...[/dim]")
+        for r in removed[:10]:
+            diffs.append(f"[red]- {r}[/red]")
+        if len(removed) > 10:
+            diffs.append(f"[dim]- {len(removed) - 10} more...[/dim]")
+        table.add_row(category, "\n".join(diffs))
+
+    _add_diff_rows("Files", result.added_files, result.removed_files)
+    _add_diff_rows("Permissions", result.added_permissions, result.removed_permissions)
+    _add_diff_rows("Components", result.added_components, result.removed_components)
+    _add_diff_rows("Classes", result.added_classes, result.removed_classes)
+    console.print(table)
+
+
+def render_search(
+    results: list[SearchResultItem], query: str, as_json: bool = False
+) -> None:
+    """Render full-text search results."""
+    if as_json:
+        print(json.dumps([r.model_dump() for r in results], indent=2))
+        return
+
+    if not results:
+        console.print(f"[yellow]No items found matching '{query}'.[/yellow]")
+        return
+
+    table = Table(
+        title=f"Search Results for '{query}' ({len(results)})",
+        show_header=True,
+        header_style="bold blue",
+    )
+    table.add_column("Type", style="yellow", width=12)
+    table.add_column("Identifier", style="cyan", width=35)
+    table.add_column("Snippet / Content", style="white")
+
+    for r in results[:100]:
+        table.add_row(r.item_type.upper(), r.identifier, r.snippet[:100])
+    console.print(table)
+    if len(results) > 100:
+        console.print(
+            f"[dim]... and {len(results) - 100} more results (use --json for all).[/dim]"
+        )
+

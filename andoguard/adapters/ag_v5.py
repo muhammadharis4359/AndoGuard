@@ -26,6 +26,8 @@ from andoguard.models import (
     StringItem,
     TargetInfo,
     TargetType,
+    XrefItem,
+    XrefResult,
 )
 from andoguard.session.store import compute_file_hashes
 from andoguard.static.cfg import build_cfg_from_basic_blocks
@@ -678,3 +680,108 @@ class AgV5Adapter(BackendAdapter):
         else:
             items.sort(key=lambda x: x.value)
         return items
+
+    def get_xrefs(self, target: str, direction: str = "both") -> XrefResult:
+        return self._executor.submit(self._get_xrefs_internal, target, direction)
+
+    def _get_xrefs_internal(self, target: str, direction: str = "both") -> XrefResult:
+        xrefs_to: list[XrefItem] = []
+        xrefs_from: list[XrefItem] = []
+
+        if not self._analysis_obj:
+            return XrefResult(target=target, xrefs_to=[], xrefs_from=[])
+
+        cls_query = target
+        meth_query = None
+        if "#" in target:
+            cls_query, meth_query = target.split("#", 1)
+        elif "->" in target:
+            cls_query, meth_query = target.split("->", 1)
+
+        # 1. Search for matching classes and methods
+        for cls in self._analysis_obj.get_classes():
+            c_name = str(cls.name)
+            is_target_class = (
+                c_name == cls_query
+                or c_name.strip("L;").replace("/", ".") == cls_query
+                or c_name == f"L{cls_query.replace('.', '/')};"
+            )
+
+            if is_target_class:
+                if meth_query:
+                    for m in cls.get_methods():
+                        if m.name == meth_query:
+                            target_repr = f"{cls.name}->{m.name}{m.descriptor}"
+                            if direction in ("both", "to") and hasattr(m, "get_xref_from"):
+                                try:
+                                    for ref_cls, ref_meth, offset in m.get_xref_from():
+                                        xrefs_to.append(
+                                            XrefItem(
+                                                caller=f"{ref_cls.name}->{ref_meth.name}{ref_meth.descriptor}",
+                                                callee=target_repr,
+                                                call_type="method",
+                                                offset=offset,
+                                            )
+                                        )
+                                except Exception:
+                                    pass
+                            if direction in ("both", "from") and hasattr(m, "get_xref_to"):
+                                try:
+                                    for ref_cls, ref_meth, offset in m.get_xref_to():
+                                        xrefs_from.append(
+                                            XrefItem(
+                                                caller=target_repr,
+                                                callee=f"{ref_cls.name}->{ref_meth.name}{ref_meth.descriptor}",
+                                                call_type="method",
+                                                offset=offset,
+                                            )
+                                        )
+                                except Exception:
+                                    pass
+                else:
+                    target_repr = str(cls.name)
+                    if direction in ("both", "to") and hasattr(cls, "get_xref_from"):
+                        try:
+                            for ref_cls in cls.get_xref_from():
+                                xrefs_to.append(
+                                    XrefItem(
+                                        caller=str(getattr(ref_cls, "name", ref_cls)),
+                                        callee=target_repr,
+                                        call_type="class",
+                                    )
+                                )
+                        except Exception:
+                            pass
+                    if direction in ("both", "from") and hasattr(cls, "get_xref_to"):
+                        try:
+                            for ref_cls in cls.get_xref_to():
+                                xrefs_from.append(
+                                    XrefItem(
+                                        caller=target_repr,
+                                        callee=str(getattr(ref_cls, "name", ref_cls)),
+                                        call_type="class",
+                                    )
+                                )
+                        except Exception:
+                            pass
+
+        # 2. String literal xrefs
+        if not xrefs_to and not xrefs_from and direction in ("both", "to"):
+            try:
+                for s in self._analysis_obj.get_strings():
+                    val = str(s.get_value())
+                    if val == target or target in val:
+                        if hasattr(s, "get_xref_from"):
+                            for ref_cls, ref_meth in s.get_xref_from():
+                                xrefs_to.append(
+                                    XrefItem(
+                                        caller=f"{ref_cls.name}->{ref_meth.name}{ref_meth.descriptor}",
+                                        callee=val,
+                                        call_type="string",
+                                    )
+                                )
+            except Exception:
+                pass
+
+        return XrefResult(target=target, xrefs_to=xrefs_to, xrefs_from=xrefs_from)
+

@@ -10,16 +10,22 @@ from andoguard.cli.commands import (
     list_sessions,
     open_target,
     resume_session,
+    search_target,
     show_certs,
     show_classes,
     show_code,
+    show_diff,
     show_disasm,
     show_files,
     show_info,
     show_manifest,
     show_methods,
+    show_native,
     show_resources,
+    show_secrets,
     show_strings,
+    show_vulns,
+    show_xrefs,
 )
 from andoguard.cli.render import render_notice
 
@@ -108,6 +114,30 @@ app.command(
     name="code",
     help="Decompile Dalvik bytecode to Java or Dalvik source representation.",
 )(show_code)
+app.command(
+    name="xrefs",
+    help="Find cross-references (callers, callees, strings) for a target symbol.",
+)(show_xrefs)
+app.command(
+    name="search",
+    help="Full-text search indexed bytecode, strings, components, and resources.",
+)(search_target)
+app.command(
+    name="secrets",
+    help="Scan bytecode and resources for API keys, credentials, and high-entropy secrets.",
+)(show_secrets)
+app.command(
+    name="vulns",
+    help="Audit target against OWASP MASVS and MASTG security standards.",
+)(show_vulns)
+app.command(
+    name="native",
+    help="Inspect native ELF shared libraries (.so), architectures, dependencies, and JNI symbols.",
+)(show_native)
+app.command(
+    name="diff",
+    help="Compare active session target against another APK or session.",
+)(show_diff)
 
 
 if __name__ == "__main__":

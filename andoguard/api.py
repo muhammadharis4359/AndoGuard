@@ -10,22 +10,32 @@ from andoguard.errors import (
     SessionNotFoundError,
     TargetNotFoundError,
 )
+from andoguard.formats.elf import parse_elf_bytes
 from andoguard.models import (
     AnalysisMode,
+    ApkDiffResult,
     ApkFileEntry,
     ClassDetail,
     CodeResult,
     DisasmResult,
+    ElfInfo,
     ManifestComponent,
     ManifestData,
     ManifestSecurityFlags,
     ResourceEntry,
+    SearchResultItem,
+    SecretFinding,
     SessionRecord,
     SignatureReport,
     StringItem,
     TargetInfo,
+    VulnerabilityReport,
+    XrefResult,
 )
 from andoguard.session.store import SessionStore
+from andoguard.static.diff import diff_andoguard_instances
+from andoguard.static.secrets import scan_strings_for_secrets
+from andoguard.static.vulns import audit_target_vulnerabilities
 
 
 class ManifestFacade:
@@ -237,6 +247,98 @@ class AndoGuard:
     def certificates(self) -> list[dict[str, Any]]:
         """Extract signing certificate information."""
         return self.backend.get_certificates()
+
+    def xrefs(self, target: str, direction: str = "both") -> XrefResult:
+        """Extract cross-references (callers/callees) for a class, method, or string."""
+        return self.backend.get_xrefs(target, direction=direction)
+
+    def secrets(self, min_entropy: float = 3.8) -> list[SecretFinding]:
+        """Scan target strings and resources for credentials, tokens, and secrets."""
+        items = self.string_items(min_len=4, entropy=True)
+        return scan_strings_for_secrets(items, min_entropy=min_entropy)
+
+    def vulns(self) -> VulnerabilityReport:
+        """Audit target against OWASP MASVS/MASTG security guidelines."""
+        m = self.manifest.data()
+        strs = self.strings(min_len=3)
+        target_name = str(self.target_info.package_name or self.target_info.target_path)
+        return audit_target_vulnerabilities(target_name, manifest=m, strings=strs)
+
+    def native(self, lib_name: str | None = None) -> list[ElfInfo]:
+        """Inspect native ELF shared libraries (.so) inside APK."""
+        import zipfile
+
+        results: list[ElfInfo] = []
+        path = Path(self.target_info.target_path)
+        if not path.exists():
+            return results
+
+        if path.is_file() and path.suffix == ".so":
+            with open(path, "rb") as f:
+                so_data = f.read()
+            results.append(parse_elf_bytes(so_data, file_name=path.name))
+        elif path.is_file() and zipfile.is_zipfile(path):
+            with zipfile.ZipFile(path, "r") as zf:
+                for entry in zf.namelist():
+                    if entry.endswith(".so"):
+                        if lib_name and lib_name.lower() not in entry.lower():
+                            continue
+                        try:
+                            so_data = zf.read(entry)
+                            results.append(parse_elf_bytes(so_data, file_name=entry))
+                        except Exception:
+                            pass
+        return results
+
+    def diff(self, other: "AndoGuard | str | Path") -> ApkDiffResult:
+        """Compare current target against another APK or AndoGuard session."""
+        import uuid
+
+        if isinstance(other, (str, Path)):
+            other_ag = AndoGuard.open(
+                other, session_name=f"diff-{uuid.uuid4().hex[:6]}"
+            )
+            try:
+                return diff_andoguard_instances(self, other_ag)
+            finally:
+                other_ag.close()
+        return diff_andoguard_instances(self, other)
+
+    def build_search_index(self) -> int:
+        """Build full-text search index for target symbols, strings, and components."""
+        items: list[tuple[str, str, str]] = []
+        for c in self.classes():
+            items.append(("class", c, c))
+            for m in self.methods(c):
+                items.append(("method", f"{c}->{m}", f"{c}->{m}"))
+
+        for s in self.strings(min_len=4):
+            items.append(("string", s[:60], s))
+
+        for comp in self.manifest.components():
+            items.append(
+                ("component", comp.name, f"{comp.component_type.upper()}: {comp.name}")
+            )
+
+        for r in self.resources():
+            items.append(
+                ("resource", r.name, f"{r.res_type}: {r.name} = {r.value or ''}")
+            )
+
+        self.session_store.index_search_items(self.session_record.session_id, items)
+        return len(items)
+
+    def search(self, query: str) -> list[SearchResultItem]:
+        """Search target bytecode symbols, strings, components, and resources."""
+        results = self.session_store.search(
+            query, session_id=self.session_record.session_id
+        )
+        if not results:
+            self.build_search_index()
+            results = self.session_store.search(
+                query, session_id=self.session_record.session_id
+            )
+        return results
 
     def close(self) -> None:
         """Release open file handles and shutdown backend workers."""

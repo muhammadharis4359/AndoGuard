@@ -281,3 +281,107 @@ class CodeResult(BaseModel):
     source: str
     cfg: ControlFlowGraph | None = None
 
+
+class XrefItem(BaseModel):
+    """Cross-reference caller or callee descriptor."""
+
+    caller: str
+    callee: str
+    call_type: str = "method"
+    offset: int | None = None
+
+
+class XrefResult(BaseModel):
+    """Target cross-references."""
+
+    target: str
+    xrefs_to: list[XrefItem] = Field(default_factory=list)
+    xrefs_from: list[XrefItem] = Field(default_factory=list)
+
+
+class SearchResultItem(BaseModel):
+    """Full-text search result item."""
+
+    item_type: str
+    identifier: str
+    snippet: str
+    session_id: str
+
+
+class SecretFinding(BaseModel):
+    """Discovered credential, token, or high-entropy secret."""
+
+    secret_type: str
+    value: str
+    entropy: float = 0.0
+    source_file: str
+    offset: int | None = None
+    provenance: str = ""
+
+
+class SeverityLevel(StrEnum):
+    """Vulnerability severity rating."""
+
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    INFO = "INFO"
+
+
+class VulnerabilityFinding(BaseModel):
+    """OWASP MASVS-aligned security weakness or finding."""
+
+    vuln_id: str
+    masvs_id: str
+    title: str
+    severity: SeverityLevel
+    description: str
+    remediation: str
+    location: str = ""
+
+
+class VulnerabilityReport(BaseModel):
+    """Structured security audit vulnerability report."""
+
+    target: str
+    findings: list[VulnerabilityFinding] = Field(default_factory=list)
+    summary: dict[str, int] = Field(default_factory=dict)
+
+
+class ElfSymbol(BaseModel):
+    """Native ELF symbol descriptor."""
+
+    name: str
+    symbol_type: str = "FUNC"
+    binding: str = "GLOBAL"
+    is_jni: bool = False
+
+
+class ElfInfo(BaseModel):
+    """Native library ELF architecture, dependencies, and symbols."""
+
+    path: str
+    arch: str
+    bits: int = 64
+    endianness: str = "little"
+    needed_libs: list[str] = Field(default_factory=list)
+    jni_exports: list[str] = Field(default_factory=list)
+    symbols_count: int = 0
+
+
+class ApkDiffResult(BaseModel):
+    """Structural difference between two Android targets or sessions."""
+
+    target_a: str
+    target_b: str
+    added_files: list[str] = Field(default_factory=list)
+    removed_files: list[str] = Field(default_factory=list)
+    added_permissions: list[str] = Field(default_factory=list)
+    removed_permissions: list[str] = Field(default_factory=list)
+    added_classes: list[str] = Field(default_factory=list)
+    removed_classes: list[str] = Field(default_factory=list)
+    added_components: list[str] = Field(default_factory=list)
+    removed_components: list[str] = Field(default_factory=list)
+
+

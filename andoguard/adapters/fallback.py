@@ -28,6 +28,7 @@ from andoguard.models import (
     StringItem,
     TargetInfo,
     TargetType,
+    XrefResult,
 )
 from andoguard.session.store import compute_file_hashes
 from andoguard.static.entropy import calculate_shannon_entropy
@@ -385,3 +386,7 @@ class FallbackAdapter(BackendAdapter):
             }
             for c in rep.certificates
         ]
+
+    def get_xrefs(self, target: str, direction: str = "both") -> XrefResult:
+        return XrefResult(target=target, xrefs_to=[], xrefs_from=[])
+

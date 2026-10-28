@@ -14,6 +14,7 @@ from andoguard.models import (
     Finding,
     FindingConfidence,
     FindingSeverity,
+    SearchResultItem,
     SessionRecord,
     TargetInfo,
 )
@@ -383,3 +384,58 @@ class SessionStore:
                 )
                 for row in rows
             ]
+
+    def index_search_items(
+        self, session_id: str, items: list[tuple[str, str, str]]
+    ) -> None:
+        """Bulk index items (item_type, identifier, snippet) for full-text search."""
+        if not items:
+            return
+        with db_session(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.executemany(
+                "INSERT INTO search_index (id, session_id, item_type, identifier, snippet) VALUES (?, ?, ?, ?, ?);",
+                [
+                    (str(uuid.uuid4()), session_id, itype, ident, snip)
+                    for itype, ident, snip in items
+                ],
+            )
+
+    def search(
+        self, query: str, session_id: str | None = None
+    ) -> list[SearchResultItem]:
+        """Search indexed symbols, strings, and components."""
+        pattern = f"%{query}%"
+        with db_session(self.db_path) as conn:
+            cur = conn.cursor()
+            if session_id:
+                cur.execute(
+                    """
+                    SELECT item_type, identifier, snippet, session_id
+                    FROM search_index
+                    WHERE session_id = ? AND (identifier LIKE ? OR snippet LIKE ?)
+                    LIMIT 200;
+                    """,
+                    (session_id, pattern, pattern),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT item_type, identifier, snippet, session_id
+                    FROM search_index
+                    WHERE identifier LIKE ? OR snippet LIKE ?
+                    LIMIT 200;
+                    """,
+                    (pattern, pattern),
+                )
+            rows = cur.fetchall()
+            return [
+                SearchResultItem(
+                    item_type=row["item_type"],
+                    identifier=row["identifier"],
+                    snippet=row["snippet"],
+                    session_id=row["session_id"],
+                )
+                for row in rows
+            ]
+
