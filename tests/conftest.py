@@ -68,18 +68,64 @@ def sample_dex_path(tmp_path: Path, minimal_dex_bytes: bytes) -> Path:
     return dex_file
 
 
+def generate_test_cert_der() -> bytes:
+    """Generate a real self-signed DER certificate for test fixtures."""
+    import datetime
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = issuer = x509.Name(
+        [
+            x509.NameAttribute(x509.NameOID.COMMON_NAME, "AndoGuard Test"),
+            x509.NameAttribute(x509.NameOID.ORGANIZATION_NAME, "AndoGuard Security"),
+        ]
+    )
+    now = datetime.datetime.now(datetime.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(12345678901234567890)
+        .not_valid_before(now - datetime.timedelta(days=1))
+        .not_valid_after(now + datetime.timedelta(days=365))
+        .sign(key, hashes.SHA256())
+    )
+    return cert.public_bytes(serialization.Encoding.DER)
+
+
 @pytest.fixture
 def sample_apk_path(tmp_path: Path, minimal_dex_bytes: bytes) -> Path:
     apk_file = tmp_path / "sample.apk"
+    manifest_content = (
+        b"<manifest xmlns:android='http://schemas.android.com/apk/res/android' "
+        b"package='com.example.testapp' android:versionCode='10' android:versionName='1.0.0'>\n"
+        b"  <uses-sdk android:minSdkVersion='24' android:targetSdkVersion='33'/>\n"
+        b"  <uses-permission android:name='android.permission.INTERNET'/>\n"
+        b"  <uses-permission android:name='android.permission.ACCESS_NETWORK_STATE'/>\n"
+        b"  <permission android:name='com.example.testapp.CUSTOM_PERM'/>\n"
+        b"  <application android:name='.App' android:debuggable='true' android:allowBackup='true' android:usesCleartextTraffic='true'>\n"
+        b"    <activity android:name='.MainActivity' android:exported='true'>\n"
+        b"      <intent-filter>\n"
+        b"        <action android:name='android.intent.action.MAIN'/>\n"
+        b"        <category android:name='android.intent.category.LAUNCHER'/>\n"
+        b"      </intent-filter>\n"
+        b"    </activity>\n"
+        b"    <service android:name='.SecretService' android:exported='false'/>\n"
+        b"  </application>\n"
+        b"</manifest>"
+    )
+    cert_bytes = generate_test_cert_der()
+
     with zipfile.ZipFile(apk_file, "w") as zf:
-        zf.writestr(
-            "AndroidManifest.xml",
-            b"<manifest xmlns:android='http://schemas.android.com/apk/res/android' package='com.example.testapp' />",
-        )
+        zf.writestr("AndroidManifest.xml", manifest_content)
         zf.writestr("classes.dex", minimal_dex_bytes)
         zf.writestr("lib/arm64-v8a/libnative.so", b"\x7fELF" + b"\x00" * 60)
         zf.writestr("assets/secret.txt", b"secret_token_12345")
-        zf.writestr("META-INF/CERT.RSA", b"dummy_cert_data")
+        zf.writestr("META-INF/CERT.RSA", cert_bytes)
     return apk_file
 
 

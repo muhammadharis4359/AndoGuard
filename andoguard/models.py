@@ -124,3 +124,94 @@ class BackendCapabilities(BaseModel):
     has_xrefs: bool = False
     has_native_support: bool = False
     has_v5_features: bool = False
+
+
+class ManifestComponent(BaseModel):
+    """Parsed Android manifest application component."""
+
+    name: str
+    component_type: str  # "activity", "service", "receiver", "provider"
+    exported: bool
+    permission: str | None = None
+    intent_filters: list[dict[str, list[str]]] = Field(default_factory=list)
+    attributes: dict[str, str] = Field(default_factory=dict)
+
+
+class ManifestSecurityFlags(BaseModel):
+    """Security-relevant application manifest flags."""
+
+    debuggable: bool = False
+    allow_backup: bool = True
+    uses_cleartext_traffic: bool = False
+    network_security_config: str | None = None
+    test_only: bool = False
+
+
+class ManifestData(BaseModel):
+    """Structured AndroidManifest.xml decoded metadata."""
+
+    package_name: str | None = None
+    version_code: int | None = None
+    version_name: str | None = None
+    min_sdk_version: int | None = None
+    target_sdk_version: int | None = None
+    permissions: list[str] = Field(default_factory=list)
+    declared_permissions: list[str] = Field(default_factory=list)
+    components: list[ManifestComponent] = Field(default_factory=list)
+    security_flags: ManifestSecurityFlags = Field(default_factory=ManifestSecurityFlags)
+    raw_xml: str | None = None
+
+
+class ResourceEntry(BaseModel):
+    """Parsed Android resource table entry."""
+
+    res_id: str
+    res_type: str
+    name: str
+    value: str | None = None
+    config: str | None = None
+
+
+class ApkFileEntry(BaseModel):
+    """File entry within an APK container."""
+
+    path: str
+    size: int
+    is_so: bool = False
+    is_asset: bool = False
+    is_dex: bool = False
+    crc: int | None = None
+
+
+class CertificateInfo(BaseModel):
+    """X.509 Certificate metadata extracted from APK signing blocks."""
+
+    sha1_fingerprint: str
+    sha256_fingerprint: str
+    md5_fingerprint: str | None = None
+    issuer: str
+    subject: str
+    valid_from: str
+    valid_to: str
+    serial_number: str | None = None
+    signature_algorithm: str | None = None
+    is_self_signed: bool = False
+
+
+class SignatureReport(BaseModel):
+    """Signature scheme report and certificate details."""
+
+    is_signed: bool = False
+    v1_signature: bool = False
+    v2_signature: bool = False
+    v3_signature: bool = False
+    certificates: list[CertificateInfo] = Field(default_factory=list)
+
+
+class StringItem(BaseModel):
+    """Extracted string literal with provenance and entropy."""
+
+    value: str
+    length: int
+    entropy: float = 0.0
+    source: str = "dex"

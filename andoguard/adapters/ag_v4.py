@@ -1,14 +1,29 @@
 """Androguard v4 adapter implementation."""
 
+import zipfile
 from pathlib import Path
 from typing import Any
 
 from andoguard.adapters.backend import BackendAdapter
 from andoguard.errors import BackendError, InvalidTargetError
 from andoguard.formats.apk import is_apk_archive
+from andoguard.formats.arsc import parse_arsc_resources
+from andoguard.formats.axml import axml_to_string, parse_axml_to_element
+from andoguard.formats.certs import extract_certificates_from_apk
 from andoguard.formats.dex import is_dex_file
-from andoguard.models import BackendCapabilities, TargetInfo, TargetType
+from andoguard.formats.manifest import parse_manifest_element
+from andoguard.models import (
+    ApkFileEntry,
+    BackendCapabilities,
+    ManifestData,
+    ResourceEntry,
+    SignatureReport,
+    StringItem,
+    TargetInfo,
+    TargetType,
+)
 from andoguard.session.store import compute_file_hashes
+from andoguard.static.entropy import calculate_shannon_entropy
 
 try:
     from loguru import logger as _loguru_logger
@@ -177,17 +192,28 @@ class AgV4Adapter(BackendAdapter):
         return self._executor.submit(self._get_manifest_xml_internal)
 
     def _get_manifest_xml_internal(self) -> str | None:
-        if not self._apk_obj:
+        if not self._apk_obj and not self._target_path:
             return None
-        try:
-            axml = self._apk_obj.get_android_manifest_axml()
-            if axml:
-                xml_data = axml.get_xml()
-                if isinstance(xml_data, bytes):
-                    return xml_data.decode("utf-8", errors="replace")
-                return str(xml_data)
-        except Exception:
-            pass
+        if self._apk_obj:
+            try:
+                axml = self._apk_obj.get_android_manifest_axml()
+                if axml:
+                    xml_data = axml.get_xml()
+                    if isinstance(xml_data, bytes):
+                        return xml_data.decode("utf-8", errors="replace")
+                    if xml_data:
+                        return str(xml_data)
+            except Exception:
+                pass
+
+        if self._target_path and self._target_path.exists():
+            try:
+                with zipfile.ZipFile(self._target_path, "r") as zf:
+                    if "AndroidManifest.xml" in zf.namelist():
+                        mb = zf.read("AndroidManifest.xml")
+                        return axml_to_string(mb)
+            except Exception:
+                pass
         return None
 
     def get_permissions(self) -> list[str]:
@@ -314,3 +340,184 @@ class AgV4Adapter(BackendAdapter):
         except Exception:
             pass
         return certs
+
+    def get_manifest_data(self) -> ManifestData:
+        return self._executor.submit(self._get_manifest_data_internal)
+
+    def _get_manifest_data_internal(self) -> ManifestData:
+        if not self._apk_obj and not self._target_path:
+            return ManifestData()
+
+        # Try obtaining ElementTree element from Androguard
+        elem = None
+        raw_xml = None
+        if self._apk_obj:
+            try:
+                elem = self._apk_obj.get_android_manifest_xml()
+            except Exception:
+                elem = None
+            try:
+                axml = self._apk_obj.get_android_manifest_axml()
+                if axml:
+                    raw_xml = axml.get_xml()
+                    if isinstance(raw_xml, bytes):
+                        raw_xml = raw_xml.decode("utf-8", errors="replace")
+            except Exception:
+                raw_xml = None
+
+        # Fallback to direct AXML parsing if needed
+        if elem is None and self._target_path and self._target_path.exists():
+            try:
+                with zipfile.ZipFile(self._target_path, "r") as zf:
+                    if "AndroidManifest.xml" in zf.namelist():
+                        mb = zf.read("AndroidManifest.xml")
+                        raw_xml = axml_to_string(mb)
+                        elem = parse_axml_to_element(mb)
+            except Exception:
+                pass
+
+        if elem is not None:
+            return parse_manifest_element(elem, raw_xml=raw_xml)
+        return ManifestData(raw_xml=raw_xml)
+
+    def get_resources(
+        self, res_type: str | None = None, grep: str | None = None
+    ) -> list[ResourceEntry]:
+        return self._executor.submit(self._get_resources_internal, res_type, grep)
+
+    def _get_resources_internal(
+        self, res_type: str | None = None, grep: str | None = None
+    ) -> list[ResourceEntry]:
+        results: list[ResourceEntry] = []
+        # Attempt via Androguard ARSC
+        if self._apk_obj:
+            try:
+                arsc = self._apk_obj.get_android_resources()
+                if arsc and hasattr(arsc, "get_resolved_strings"):
+                    res_strings = arsc.get_resolved_strings()
+                    for pkg, types in res_strings.items():
+                        for tname, items in types.items():
+                            if res_type and tname.lower() != res_type.lower():
+                                continue
+                            for r_id, val in items.items():
+                                val_str = str(val) if val is not None else None
+                                if grep and (
+                                    not val_str or grep.lower() not in val_str.lower()
+                                ):
+                                    continue
+                                results.append(
+                                    ResourceEntry(
+                                        res_id=hex(r_id)
+                                        if isinstance(r_id, int)
+                                        else str(r_id),
+                                        res_type=tname,
+                                        name=f"res_{r_id}",
+                                        value=val_str,
+                                        config=pkg,
+                                    )
+                                )
+            except Exception:
+                pass
+
+        # Fallback via direct resources.arsc parsing if needed
+        if not results and self._target_path and self._target_path.exists():
+            try:
+                with zipfile.ZipFile(self._target_path, "r") as zf:
+                    if "resources.arsc" in zf.namelist():
+                        raw_arsc = zf.read("resources.arsc")
+                        parsed = parse_arsc_resources(raw_arsc)
+                        for r in parsed:
+                            if res_type and r.res_type.lower() != res_type.lower():
+                                continue
+                            if (
+                                grep
+                                and grep.lower() not in r.name.lower()
+                                and (not r.value or grep.lower() not in r.value.lower())
+                            ):
+                                continue
+                            results.append(r)
+            except Exception:
+                pass
+
+        return results
+
+    def get_file_entries(
+        self, so_only: bool = False, assets_only: bool = False
+    ) -> list[ApkFileEntry]:
+        return self._executor.submit(
+            self._get_file_entries_internal, so_only, assets_only
+        )
+
+    def _get_file_entries_internal(
+        self, so_only: bool = False, assets_only: bool = False
+    ) -> list[ApkFileEntry]:
+        entries: list[ApkFileEntry] = []
+        if not self._target_path or not self._target_path.exists():
+            return entries
+
+        try:
+            with zipfile.ZipFile(self._target_path, "r") as zf:
+                for info in zf.infolist():
+                    p = info.filename
+                    is_so = p.startswith("lib/") and p.endswith(".so")
+                    is_asset = p.startswith("assets/")
+                    is_dex = p.endswith(".dex")
+
+                    if so_only and not is_so:
+                        continue
+                    if assets_only and not is_asset:
+                        continue
+
+                    entries.append(
+                        ApkFileEntry(
+                            path=p,
+                            size=info.file_size,
+                            is_so=is_so,
+                            is_asset=is_asset,
+                            is_dex=is_dex,
+                            crc=info.CRC,
+                        )
+                    )
+        except Exception:
+            pass
+
+        return entries
+
+    def get_signature_report(self) -> SignatureReport:
+        return self._executor.submit(self._get_signature_report_internal)
+
+    def _get_signature_report_internal(self) -> SignatureReport:
+        if not self._target_path or not self._target_path.exists():
+            return SignatureReport(is_signed=False)
+        return extract_certificates_from_apk(self._target_path)
+
+    def get_string_items(
+        self, min_len: int = 4, calculate_entropy: bool = False
+    ) -> list[StringItem]:
+        return self._executor.submit(
+            self._get_string_items_internal, min_len, calculate_entropy
+        )
+
+    def _get_string_items_internal(
+        self, min_len: int = 4, calculate_entropy: bool = False
+    ) -> list[StringItem]:
+        unique_strings: set[str] = set()
+        if self._analysis_obj:
+            try:
+                for s in self._analysis_obj.get_strings():
+                    val = str(s.get_value())
+                    if len(val) >= min_len:
+                        unique_strings.add(val)
+            except Exception:
+                pass
+
+        items: list[StringItem] = []
+        for s in unique_strings:
+            ent = calculate_shannon_entropy(s) if calculate_entropy else 0.0
+            items.append(StringItem(value=s, length=len(s), entropy=ent, source="dex"))
+
+        if calculate_entropy:
+            items.sort(key=lambda x: x.entropy, reverse=True)
+        else:
+            items.sort(key=lambda x: x.value)
+        return items

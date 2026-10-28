@@ -9,7 +9,15 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from andoguard.errors import BackendError, ConcurrencyError
-from andoguard.models import BackendCapabilities, TargetInfo
+from andoguard.models import (
+    ApkFileEntry,
+    BackendCapabilities,
+    ManifestData,
+    ResourceEntry,
+    SignatureReport,
+    StringItem,
+    TargetInfo,
+)
 
 T = TypeVar("T")
 
@@ -189,3 +197,29 @@ class BackendAdapter(ABC):
     @abstractmethod
     def get_certificates(self) -> list[dict[str, Any]]:
         """Extract signing certificate details."""
+
+    @abstractmethod
+    def get_manifest_data(self) -> ManifestData:
+        """Extract complete structured AndroidManifest.xml metadata."""
+
+    @abstractmethod
+    def get_resources(
+        self, res_type: str | None = None, grep: str | None = None
+    ) -> list[ResourceEntry]:
+        """Extract and filter Android resources."""
+
+    @abstractmethod
+    def get_file_entries(
+        self, so_only: bool = False, assets_only: bool = False
+    ) -> list[ApkFileEntry]:
+        """List container files with metadata and category flags."""
+
+    @abstractmethod
+    def get_signature_report(self) -> SignatureReport:
+        """Extract APK signature schemes (v1, v2, v3) and certificate details."""
+
+    @abstractmethod
+    def get_string_items(
+        self, min_len: int = 4, calculate_entropy: bool = False
+    ) -> list[StringItem]:
+        """Extract string items with length, source, and Shannon entropy."""

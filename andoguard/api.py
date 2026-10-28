@@ -10,7 +10,18 @@ from andoguard.errors import (
     SessionNotFoundError,
     TargetNotFoundError,
 )
-from andoguard.models import AnalysisMode, SessionRecord, TargetInfo
+from andoguard.models import (
+    AnalysisMode,
+    ApkFileEntry,
+    ManifestComponent,
+    ManifestData,
+    ManifestSecurityFlags,
+    ResourceEntry,
+    SessionRecord,
+    SignatureReport,
+    StringItem,
+    TargetInfo,
+)
 from andoguard.session.store import SessionStore
 
 
@@ -20,27 +31,37 @@ class ManifestFacade:
     def __init__(self, backend: BackendAdapter) -> None:
         self._backend = backend
 
+    def data(self) -> ManifestData:
+        """Return the structured ManifestData object."""
+        return self._backend.get_manifest_data()
+
     def xml(self) -> str | None:
         """Return the decoded XML manifest string."""
         return self._backend.get_manifest_xml()
 
     def permissions(self) -> list[str]:
         """Return all declared and requested permissions."""
-        return self._backend.get_permissions()
+        data = self.data()
+        return data.permissions if data else self._backend.get_permissions()
 
-    def components(self) -> dict[str, list[str]]:
-        """Return all declared components by category."""
-        return self._backend.get_components()
+    def declared_permissions(self) -> list[str]:
+        """Return all custom permissions declared by the app."""
+        data = self.data()
+        return data.declared_permissions if data else []
 
-    def exported_components(self) -> list[str]:
+    def components(self) -> list[ManifestComponent]:
+        """Return all declared components."""
+        data = self.data()
+        return data.components if data else []
+
+    def exported_components(self) -> list[ManifestComponent]:
         """Return list of exported Android components."""
-        # For M1, returns basic list from components
-        comps = self.components()
-        exported: list[str] = []
-        for cat, names in comps.items():
-            for name in names:
-                exported.append(f"{cat[:-1]}:{name}")
-        return exported
+        return [c for c in self.components() if c.exported]
+
+    def security_flags(self) -> ManifestSecurityFlags:
+        """Return security flags defined in the manifest."""
+        data = self.data()
+        return data.security_flags if data else ManifestSecurityFlags()
 
 
 class AndoGuard:
@@ -94,6 +115,7 @@ class AndoGuard:
             name=session_name,
             mode=mode,
         )
+        store.set_active_session(session.session_id)
 
         return cls(
             backend=backend,
@@ -161,9 +183,29 @@ class AndoGuard:
         """List all entries in the APK archive."""
         return self.backend.get_files()
 
+    def file_entries(
+        self, so_only: bool = False, assets_only: bool = False
+    ) -> list[ApkFileEntry]:
+        """List file entries with metadata and category filters."""
+        return self.backend.get_file_entries(so_only=so_only, assets_only=assets_only)
+
+    def resources(
+        self, res_type: str | None = None, grep: str | None = None
+    ) -> list[ResourceEntry]:
+        """Extract and filter Android resources."""
+        return self.backend.get_resources(res_type=res_type, grep=grep)
+
+    def certs(self) -> SignatureReport:
+        """Extract APK signature schemes (v1, v2, v3) and certificate details."""
+        return self.backend.get_signature_report()
+
     def strings(self, min_len: int = 4, entropy: bool = False) -> list[str]:
         """Extract strings from target."""
         return self.backend.get_strings(min_len=min_len, entropy=entropy)
+
+    def string_items(self, min_len: int = 4, entropy: bool = False) -> list[StringItem]:
+        """Extract string items with length, source, and Shannon entropy."""
+        return self.backend.get_string_items(min_len=min_len, calculate_entropy=entropy)
 
     def certificates(self) -> list[dict[str, Any]]:
         """Extract signing certificate information."""

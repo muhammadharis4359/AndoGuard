@@ -141,6 +141,13 @@ class SessionStore:
         if not name:
             sanitized = Path(target.target_path).stem.replace(" ", "_")
             name = f"{sanitized}-{session_id}"
+        else:
+            with db_session(self.db_path) as conn:
+                existing = conn.execute(
+                    "SELECT id FROM sessions WHERE name = ?;", (name,)
+                ).fetchone()
+                if existing:
+                    name = f"{name}-{session_id}"
 
         session_dir = self.config.get_session_dir(session_id)
         now = datetime.now(UTC).isoformat()
