@@ -553,4 +553,41 @@ class SessionStore:
             rows = cur.fetchall()
             return [dict(r) for r in rows]
 
+    def record_artifact(
+        self,
+        session_id: str,
+        name: str,
+        rel_path: str,
+        sha256: str,
+        size: int,
+        artifact_type: str = "general",
+    ) -> str:
+        """Record an artifact file in the session."""
+        artifact_id = str(uuid.uuid4())
+        now = datetime.now(UTC).isoformat()
+        with db_session(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO artifacts (id, session_id, name, rel_path, sha256, size, artifact_type, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (artifact_id, session_id, name, rel_path, sha256, size, artifact_type, now),
+            )
+        return artifact_id
+
+    def get_artifacts(self, session_id: str) -> list[dict[str, Any]]:
+        """Retrieve all recorded artifacts for a session."""
+        with db_session(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT * FROM artifacts WHERE session_id = ? ORDER BY created_at ASC;",
+                (session_id,),
+            )
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
+
+    def register_target(self, target: TargetInfo) -> None:
+        """Persist target info (alias for save_target)."""
+        self.save_target(target)
+
 

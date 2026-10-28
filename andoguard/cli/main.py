@@ -10,6 +10,9 @@ from andoguard.cli.commands import (
     adaptive_app,
     ai_app,
     dynamic_app,
+    export_bundle_cmd,
+    generate_report_cmd,
+    import_bundle_cmd,
     list_sessions,
     open_target,
     resume_session,
@@ -141,6 +144,18 @@ app.command(
     name="diff",
     help="Compare active session target against another APK or session.",
 )(show_diff)
+app.command(
+    name="report",
+    help="Generate comprehensive security assessment report (Markdown, HTML, or JSON).",
+)(generate_report_cmd)
+app.command(
+    name="export",
+    help="Export session, findings, and artifacts into verified .agguard bundle.",
+)(export_bundle_cmd)
+app.command(
+    name="import",
+    help="Import and verify an .agguard session archive into local database.",
+)(import_bundle_cmd)
 app.add_typer(dynamic_app, name="dynamic")
 app.add_typer(ai_app, name="ai")
 app.add_typer(adaptive_app, name="adaptive")

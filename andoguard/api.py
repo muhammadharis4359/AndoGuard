@@ -614,6 +614,33 @@ class AndoGuard:
         agent = AdaptiveAgent()
         return agent.plan(self, goal, provider=provider)
 
+    def generate_report(self, format: str = "markdown") -> str:
+        """Generate comprehensive assessment report ('markdown', 'html', or 'json')."""
+        from andoguard.report.generator import generate_report
+
+        return generate_report(self, format=format)
+
+    def export_bundle(self, out_path: str | Path | None = None) -> Path:
+        """Export session into an integrity-verified .agguard zip archive."""
+        from andoguard.session.bundle import export_session_bundle
+
+        return export_session_bundle(self, out_path=out_path)
+
+    @classmethod
+    def import_bundle(
+        cls,
+        bundle_path: str | Path,
+        work_dir: str | Path | None = None,
+    ) -> SessionRecord:
+        """Import an .agguard session archive into local database."""
+        from andoguard.session.bundle import import_session_bundle
+
+        cfg = AndoGuardConfig.load()
+        if work_dir:
+            cfg.work_dir = Path(work_dir)
+            cfg.ensure_directories()
+        return import_session_bundle(bundle_path, config=cfg)
+
     def close(self) -> None:
         """Release open file handles and shutdown backend workers."""
         self.backend.close()

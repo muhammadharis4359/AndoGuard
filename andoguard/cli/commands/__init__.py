@@ -1,5 +1,6 @@
 from andoguard.cli.commands.adaptive_cmd import adaptive_app
 from andoguard.cli.commands.ai_cmd import ai_app
+from andoguard.cli.commands.bundle_cmd import export_bundle_cmd, import_bundle_cmd
 from andoguard.cli.commands.certs_cmd import show_certs
 from andoguard.cli.commands.classes_cmd import show_classes
 from andoguard.cli.commands.code_cmd import show_code
@@ -12,6 +13,7 @@ from andoguard.cli.commands.manifest_cmd import show_manifest
 from andoguard.cli.commands.methods_cmd import show_methods
 from andoguard.cli.commands.native_cmd import show_native
 from andoguard.cli.commands.open_cmd import open_target
+from andoguard.cli.commands.report_cmd import generate_report_cmd
 from andoguard.cli.commands.resources_cmd import show_resources
 from andoguard.cli.commands.search_cmd import search_target
 from andoguard.cli.commands.secrets_cmd import show_secrets
@@ -43,4 +45,7 @@ __all__ = [
     "ai_app",
     "adaptive_app",
     "dynamic_app",
+    "generate_report_cmd",
+    "export_bundle_cmd",
+    "import_bundle_cmd",
 ]

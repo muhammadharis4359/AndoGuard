@@ -202,6 +202,16 @@ class CertificateInfo(BaseModel):
     signature_algorithm: str | None = None
     is_self_signed: bool = False
 
+    @property
+    def sha256(self) -> str:
+        """Alias for sha256_fingerprint."""
+        return self.sha256_fingerprint
+
+    @property
+    def sha1(self) -> str:
+        """Alias for sha1_fingerprint."""
+        return self.sha1_fingerprint
+
 
 class SignatureReport(BaseModel):
     """Signature scheme report and certificate details."""
