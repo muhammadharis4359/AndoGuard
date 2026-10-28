@@ -443,4 +443,25 @@ class HookResult(BaseModel):
     script: str = ""
 
 
+class AdaptiveStep(BaseModel):
+    """Single action step in autonomous analysis loop."""
+
+    step_index: int
+    thought: str = ""
+    tool_name: str
+    tool_args: dict[str, Any] = Field(default_factory=dict)
+    tool_output: Any = None
+    status: str = "success"
+
+
+class AdaptiveRunResult(BaseModel):
+    """Execution summary of an autonomous adaptive assessment."""
+
+    goal: str
+    autonomy_level: str
+    steps: list[AdaptiveStep] = Field(default_factory=list)
+    findings_recorded: int = 0
+    summary: str = ""
+
+
 

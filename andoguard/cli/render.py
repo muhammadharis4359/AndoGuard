@@ -14,6 +14,7 @@ from rich.text import Text
 
 from andoguard.errors import AndoGuardError
 from andoguard.models import (
+    AdaptiveRunResult,
     ApkDiffResult,
     ApkFileEntry,
     CodeResult,
@@ -915,5 +916,54 @@ def render_ai_panel(content: str, title: str = "AI Analysis") -> None:
     console.print(
         Panel(md, title=f"[bold cyan]{title}[/bold cyan]", border_style="cyan")
     )
+
+
+def render_adaptive_run(result: AdaptiveRunResult, as_json: bool = False) -> None:
+    """Render autonomous agent execution trace and summary."""
+    if as_json:
+        print(result.model_dump_json(indent=2))
+        return
+
+    table = Table(
+        title=f"Autonomous Execution: '{result.goal}' ({result.autonomy_level.upper()})",
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Step", style="dim", width=6, justify="right")
+    table.add_column("Tool", style="bold yellow", width=22)
+    table.add_column("Reasoning & Observation", style="white")
+    table.add_column("Status", width=10, justify="center")
+
+    for s in result.steps:
+        status_styled = (
+            "[bold green]OK[/bold green]"
+            if s.status == "success"
+            else "[bold red]FAIL[/bold red]"
+        )
+        obs_preview = str(s.tool_output)[:120] if s.tool_output else ""
+        text = f"[italic cyan]{s.thought}[/italic cyan]\n[dim]{obs_preview}[/dim]"
+        table.add_row(str(s.step_index), s.tool_name, text, status_styled)
+
+    console.print(table)
+    console.print(
+        Panel(
+            result.summary,
+            title="[bold green]Assessment Summary[/bold green]",
+            border_style="green",
+        )
+    )
+
+
+def render_adaptive_plan(
+    plan_steps: list[str], goal: str, as_json: bool = False
+) -> None:
+    """Render autonomous execution plan."""
+    if as_json:
+        print(json.dumps({"goal": goal, "plan": plan_steps}, indent=2))
+        return
+
+    console.print(f"[bold cyan]Autonomous Execution Plan for:[/bold cyan] '{goal}'")
+    for step in plan_steps:
+        console.print(f"  [yellow]>[/yellow] {step}")
 
 

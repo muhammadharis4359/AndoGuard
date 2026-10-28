@@ -1,3 +1,4 @@
+from andoguard.cli.commands.adaptive_cmd import adaptive_app
 from andoguard.cli.commands.ai_cmd import ai_app
 from andoguard.cli.commands.certs_cmd import show_certs
 from andoguard.cli.commands.classes_cmd import show_classes
@@ -40,5 +41,6 @@ __all__ = [
     "show_native",
     "show_diff",
     "ai_app",
+    "adaptive_app",
     "dynamic_app",
 ]

@@ -30,6 +30,7 @@ from andoguard.errors import (
 )
 from andoguard.formats.elf import parse_elf_bytes
 from andoguard.models import (
+    AdaptiveRunResult,
     AnalysisMode,
     ApkDiffResult,
     ApkFileEntry,
@@ -588,6 +589,30 @@ class AndoGuard:
         resp = p.generate(prompt, system=system)
         cache.put(cache_key, p.name, p.model, resp)
         return resp
+
+    def adaptive_run(
+        self,
+        goal: str = "Perform full security audit",
+        autonomy: str = "full",
+        max_steps: int = 10,
+        provider: str | None = None,
+    ) -> AdaptiveRunResult:
+        """Run autonomous agent loop to achieve reverse engineering or audit goal."""
+        from andoguard.adaptive.agent import AdaptiveAgent
+
+        agent = AdaptiveAgent(autonomy_level=autonomy, max_steps=max_steps)
+        return agent.run(self, goal, provider=provider)
+
+    def adaptive_plan(
+        self,
+        goal: str = "Perform full security audit",
+        provider: str | None = None,
+    ) -> list[str]:
+        """Generate high-level step plan for goal without executing tools."""
+        from andoguard.adaptive.agent import AdaptiveAgent
+
+        agent = AdaptiveAgent()
+        return agent.plan(self, goal, provider=provider)
 
     def close(self) -> None:
         """Release open file handles and shutdown backend workers."""

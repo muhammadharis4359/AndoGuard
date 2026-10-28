@@ -353,6 +353,24 @@ class MockAiProvider(AiProvider):
         temperature: float = 0.2,
     ) -> str:
         self.call_history.append({"prompt": prompt, "system": system})
+        if "action json" in prompt.lower() or "available tools" in (system or "").lower():
+            if "step: 1" in prompt.lower() or "step 1" in prompt.lower():
+                return (
+                    '{\n'
+                    '  "thought": "Inspect manifest for exported components and permissions",\n'
+                    '  "tool": "get_manifest_info",\n'
+                    '  "args": {},\n'
+                    '  "finished": false\n'
+                    '}'
+                )
+            return (
+                '{\n'
+                '  "thought": "Goal achieved after inspection",\n'
+                '  "tool": "finish",\n'
+                '  "args": {},\n'
+                '  "finished": true\n'
+                '}'
+            )
         if "triage" in prompt.lower() or "findings" in prompt.lower():
             return (
                 "### AndoGuard AI Security Triage\n\n"

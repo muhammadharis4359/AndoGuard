@@ -354,6 +354,35 @@ class SessionStore:
                 ),
             )
 
+    def record_finding(
+        self,
+        session_id: str,
+        title: str,
+        severity: FindingSeverity,
+        confidence: FindingConfidence,
+        evidence: str,
+        remediation: str,
+        masvs_id: str | None = None,
+        provenance: str = "manual",
+    ) -> str:
+        """Create and persist a new Finding record."""
+        fid = str(uuid.uuid4())
+        now = datetime.now(UTC).isoformat()
+        finding = Finding(
+            id=fid,
+            session_id=session_id,
+            title=title,
+            severity=severity,
+            confidence=confidence,
+            masvs_id=masvs_id,
+            evidence=evidence,
+            remediation=remediation,
+            provenance=provenance,
+            created_at=now,
+        )
+        self.add_finding(finding)
+        return fid
+
     def get_findings(
         self, session_id: str, severity: FindingSeverity | None = None
     ) -> list[Finding]:
