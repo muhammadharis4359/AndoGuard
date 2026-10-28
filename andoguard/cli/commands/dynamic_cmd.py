@@ -1,6 +1,7 @@
 """CLI subcommands for dynamic instrumentation ('andoguard dynamic ...')."""
 
 import json
+import time
 from pathlib import Path
 
 import typer
@@ -11,21 +12,37 @@ from andoguard.cli.render import (
     render_devices,
     render_error,
     render_processes,
+    render_trace_event,
+    render_trace_events,
     status_spinner,
 )
+from andoguard.config import AndoGuardConfig
+from andoguard.dynamic.bypasses import generate_combined_bypass
 from andoguard.dynamic.generator import (
     generate_java_class_hook,
     generate_java_method_hook,
     generate_native_hook,
 )
+from andoguard.dynamic.memory import (
+    generate_memory_dump_script,
+    generate_memory_search_script,
+)
 from andoguard.dynamic.tracer import generate_pattern_tracer_script
 from andoguard.errors import AndoGuardError
+from andoguard.session.store import SessionStore
 
 dynamic_app = typer.Typer(
     name="dynamic",
     help="Dynamic instrumentation, Frida runtime hooking, and device interaction.",
     no_args_is_help=True,
 )
+
+mem_app = typer.Typer(
+    name="mem",
+    help="Process memory inspection, range scanning, and dumping.",
+    no_args_is_help=True,
+)
+dynamic_app.add_typer(mem_app)
 
 
 @dynamic_app.command(name="devices", help="List connected Android devices and emulators.")
@@ -259,6 +276,166 @@ def trace_pattern(
             console.print(f"[bold green]Saved tracer script to[/bold green] '{out_file}'")
         else:
             print(script)
+    except Exception as exc:
+        render_error(exc)
+        raise typer.Exit(code=1) from exc
+
+
+@dynamic_app.command(
+    name="bypass",
+    help="Generate security test bypass script (SSL pinning, root, debug, emulator, or all).",
+)
+def bypass_command(
+    module: str = typer.Argument(
+        "all",
+        help="Target module to bypass ('ssl', 'root', 'debug', 'emulator', or 'all').",
+    ),
+    out_file: Path | None = typer.Option(
+        None,
+        "--out",
+        "-o",
+        help="Output script to file path.",
+    ),
+) -> None:
+    try:
+        if module == "all":
+            script = generate_combined_bypass()
+        else:
+            script = generate_combined_bypass([module])
+
+        if out_file:
+            out_file.write_text(script, encoding="utf-8")
+            console.print(f"[bold green]Saved bypass script to[/bold green] '{out_file}'")
+        else:
+            print(script)
+    except Exception as exc:
+        render_error(exc)
+        raise typer.Exit(code=1) from exc
+
+
+@mem_app.command(
+    name="search",
+    help="Generate memory range scanning script for target string or hex pattern.",
+)
+def mem_search(
+    pattern: str = typer.Argument(
+        ..., help="Search pattern (ASCII string or hex bytes)."
+    ),
+    is_hex: bool = typer.Option(
+        False,
+        "--hex",
+        help="Interpret pattern as hex bytes (e.g. '48 65 6c 6c 6f').",
+    ),
+    out_file: Path | None = typer.Option(
+        None, "--out", "-o", help="Output script to file."
+    ),
+) -> None:
+    try:
+        script = generate_memory_search_script(pattern, is_hex=is_hex)
+        if out_file:
+            out_file.write_text(script, encoding="utf-8")
+            console.print(
+                f"[bold green]Saved memory search script to[/bold green] '{out_file}'"
+            )
+        else:
+            print(script)
+    except Exception as exc:
+        render_error(exc)
+        raise typer.Exit(code=1) from exc
+
+
+@mem_app.command(name="dump", help="Generate memory range dumping script.")
+def mem_dump(
+    address: str = typer.Argument(
+        ..., help="Hex base address to dump (e.g. '0x7fff0000')."
+    ),
+    length: int = typer.Argument(..., help="Number of bytes to dump."),
+    out_file: Path | None = typer.Option(
+        None, "--out", "-o", help="Output script to file."
+    ),
+) -> None:
+    try:
+        script = generate_memory_dump_script(address, length)
+        if out_file:
+            out_file.write_text(script, encoding="utf-8")
+            console.print(
+                f"[bold green]Saved memory dump script to[/bold green] '{out_file}'"
+            )
+        else:
+            print(script)
+    except Exception as exc:
+        render_error(exc)
+        raise typer.Exit(code=1) from exc
+
+
+@dynamic_app.command(
+    name="traces", help="View recorded dynamic trace events for a session."
+)
+def view_traces(
+    session_id: str | None = typer.Option(
+        None,
+        "--session",
+        "-s",
+        help="Target session ID. Defaults to active session.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Output traces in JSON format.",
+    ),
+) -> None:
+    try:
+        cfg = AndoGuardConfig()
+        store = SessionStore(cfg)
+        sid = session_id
+        if not sid:
+            active = store.get_active_session()
+            if not active:
+                console.print(
+                    "[yellow]No active session found. Specify --session <id>[/yellow]"
+                )
+                raise typer.Exit(code=1)
+            sid = active.id
+
+        events = store.get_trace_events(sid)
+        render_trace_events(events, as_json=json_output)
+    except AndoGuardError as exc:
+        render_error(exc)
+        raise typer.Exit(code=3) from exc
+    except Exception as exc:
+        render_error(exc)
+        raise typer.Exit(code=1) from exc
+
+
+@dynamic_app.command(
+    name="replay", help="Replay recorded dynamic trace events sequentially."
+)
+def replay_traces(
+    session_id: str = typer.Argument(
+        ..., help="Session ID whose traces to replay."
+    ),
+    delay: float = typer.Option(
+        0.0, "--delay", help="Delay between replayed events in seconds."
+    ),
+) -> None:
+    try:
+        cfg = AndoGuardConfig()
+        store = SessionStore(cfg)
+        events = store.get_trace_events(session_id)
+        if not events:
+            console.print(
+                f"[yellow]No trace events recorded for session '{session_id}'.[/yellow]"
+            )
+            return
+
+        console.print(
+            f"[bold blue]Replaying {len(events)} events for session '{session_id}'...[/bold blue]"
+        )
+        for e in events:
+            render_trace_event(e)
+            if delay > 0:
+                time.sleep(delay)
+        console.print("[bold green]Trace replay finished.[/bold green]")
     except Exception as exc:
         render_error(exc)
         raise typer.Exit(code=1) from exc

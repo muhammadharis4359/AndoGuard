@@ -6,10 +6,15 @@ from typing import Any
 from andoguard.adapters.backend import BackendAdapter
 from andoguard.adapters.detect import create_backend
 from andoguard.config import AndoGuardConfig
+from andoguard.dynamic.bypasses import generate_combined_bypass
 from andoguard.dynamic.generator import (
     generate_java_class_hook,
     generate_java_method_hook,
     generate_native_hook,
+)
+from andoguard.dynamic.memory import (
+    generate_memory_dump_script,
+    generate_memory_search_script,
 )
 from andoguard.dynamic.tracer import generate_pattern_tracer_script
 from andoguard.errors import (
@@ -37,6 +42,7 @@ from andoguard.models import (
     SignatureReport,
     StringItem,
     TargetInfo,
+    TraceEvent,
     VulnerabilityReport,
     XrefResult,
 )
@@ -441,6 +447,61 @@ class AndoGuard:
     def generate_tracer(self, pattern: str) -> str:
         """Generate Frida tracing script matching class or method pattern."""
         return generate_pattern_tracer_script(pattern)
+
+    def bypass(self, module: str = "all") -> str:
+        """Generate security bypass script (ssl, root, debug, emulator, or all)."""
+        if module == "all":
+            return generate_combined_bypass()
+        return generate_combined_bypass([module])
+
+    def search_memory(self, pattern: str, is_hex: bool = False) -> str:
+        """Generate Frida script to search readable memory ranges for pattern."""
+        return generate_memory_search_script(pattern, is_hex=is_hex)
+
+    @property
+    def session(self) -> SessionRecord:
+        """Active session record."""
+        return self.session_record
+
+    @property
+    def store(self) -> SessionStore:
+        """Active session store."""
+        return self.session_store
+
+    def dump_memory(self, address: str, length: int) -> str:
+        """Generate Frida script to dump memory range at address."""
+        return generate_memory_dump_script(address, length)
+
+    def trace_events(self, session_id: str | None = None) -> list[TraceEvent]:
+        """Retrieve recorded dynamic trace events."""
+        sid = session_id or self.session_record.session_id
+        return self.session_store.get_trace_events(sid)
+
+    def save_trace_event(
+        self, event: TraceEvent, session_id: str | None = None
+    ) -> None:
+        """Persist dynamic trace event."""
+        sid = session_id or self.session_record.session_id
+        self.session_store.save_trace_event(sid, event)
+
+    def hooks(self, session_id: str | None = None) -> list[dict[str, Any]]:
+        """Retrieve recorded dynamic hooks for session."""
+        sid = session_id or self.session_record.session_id
+        return self.session_store.get_hooks(sid)
+
+    def save_hook(
+        self,
+        class_name: str,
+        method_name: str,
+        script: str,
+        status: str = "active",
+        session_id: str | None = None,
+    ) -> str:
+        """Persist hook script for session."""
+        sid = session_id or self.session_record.session_id
+        return self.session_store.save_hook(
+            sid, class_name, method_name, script, status=status
+        )
 
     def close(self) -> None:
         """Release open file handles and shutdown backend workers."""

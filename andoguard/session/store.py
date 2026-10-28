@@ -5,6 +5,7 @@ import json
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from andoguard.config import AndoGuardConfig
 from andoguard.errors import SessionNotFoundError, TargetNotFoundError
@@ -17,6 +18,7 @@ from andoguard.models import (
     SearchResultItem,
     SessionRecord,
     TargetInfo,
+    TraceEvent,
 )
 from andoguard.session.db import apply_migrations, db_session
 
@@ -438,4 +440,88 @@ class SessionStore:
                 )
                 for row in rows
             ]
+
+    def save_trace_event(self, session_id: str, event: TraceEvent) -> None:
+        """Persist dynamic trace event into session traces table."""
+        with db_session(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO traces (id, session_id, timestamp, event_type, class_name, method_name, args_json, ret_val)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    str(uuid.uuid4()),
+                    session_id,
+                    event.timestamp,
+                    event.event_type,
+                    event.class_name,
+                    event.method_name,
+                    json.dumps(event.args),
+                    event.return_val,
+                ),
+            )
+
+    def get_trace_events(self, session_id: str) -> list[TraceEvent]:
+        """Retrieve stored trace events for session."""
+        with db_session(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT * FROM traces WHERE session_id = ? ORDER BY timestamp ASC;",
+                (session_id,),
+            )
+            rows = cur.fetchall()
+            results: list[TraceEvent] = []
+            for r in rows:
+                args_list = []
+                if r["args_json"]:
+                    try:
+                        args_list = json.loads(r["args_json"])
+                    except Exception:
+                        args_list = []
+                results.append(
+                    TraceEvent(
+                        timestamp=r["timestamp"],
+                        event_type=r["event_type"],
+                        class_name=r["class_name"] or "",
+                        method_name=r["method_name"] or "",
+                        args=[str(a) for a in args_list],
+                        return_val=r["ret_val"],
+                    )
+                )
+            return results
+
+    def save_hook(
+        self,
+        session_id: str,
+        class_name: str,
+        method_name: str,
+        script: str,
+        status: str = "active",
+    ) -> str:
+        """Record installed hook script in database."""
+        hook_id = str(uuid.uuid4())
+        now = datetime.now(UTC).isoformat()
+        with db_session(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO hooks (id, session_id, class_name, method_name, script, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?);
+                """,
+                (hook_id, session_id, class_name, method_name, script, status, now),
+            )
+        return hook_id
+
+    def get_hooks(self, session_id: str) -> list[dict[str, Any]]:
+        """Retrieve recorded hooks for session."""
+        with db_session(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT * FROM hooks WHERE session_id = ? ORDER BY created_at ASC;",
+                (session_id,),
+            )
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
+
 

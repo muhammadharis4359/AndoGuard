@@ -65,6 +65,11 @@ class SessionRecord(BaseModel):
     updated_at: str
     notes: str | None = None
 
+    @property
+    def id(self) -> str:
+        """Alias for session_id."""
+        return self.session_id
+
 
 class FindingSeverity(StrEnum):
     """Vulnerability finding severity levels."""

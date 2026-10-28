@@ -832,3 +832,49 @@ def render_trace_event(event: TraceEvent) -> None:
         )
 
 
+def render_trace_events(events: list[TraceEvent], as_json: bool = False) -> None:
+    """Render list of dynamic trace events."""
+    if as_json:
+        data = [
+            {
+                "timestamp": e.timestamp,
+                "event_type": e.event_type,
+                "class_name": e.class_name,
+                "method_name": e.method_name,
+                "args": e.args,
+                "return_val": e.return_val,
+            }
+            for e in events
+        ]
+        print(json.dumps(data, indent=2))
+        return
+
+    if not events:
+        console.print("[yellow]No trace events recorded for this session.[/yellow]")
+        return
+
+    table = Table(
+        title=f"Recorded Trace Events ({len(events)})",
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Time", style="dim", width=20)
+    table.add_column("Type", width=8)
+    table.add_column("Target", style="cyan")
+    table.add_column("Details", style="white")
+
+    for e in events:
+        target = f"{e.class_name}#{e.method_name}" if e.class_name else e.method_name
+        if e.event_type in ("call", "trace_call"):
+            type_styled = "[bold green]CALL[/bold green]"
+            details = f"args: ({', '.join(e.args)})"
+        elif e.event_type in ("return", "trace_return"):
+            type_styled = "[bold magenta]RET[/bold magenta]"
+            details = f"ret: {e.return_val}"
+        else:
+            type_styled = f"[blue]{e.event_type}[/blue]"
+            details = f"args: {e.args}, ret: {e.return_val}"
+        table.add_row(e.timestamp[:19], type_styled, target, details)
+    console.print(table)
+
+
