@@ -1,0 +1,107 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "andoguard"
+version = "0.1.0"
+description = "Authorized Android reverse engineering and security testing toolkit"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "AndoGuard Team" }
+]
+keywords = ["android", "security", "reverse-engineering", "static-analysis", "apk", "dex"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Typing :: Typed",
+]
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+androguard = [
+    "androguard>=4.0.0",
+]
+frida = [
+    "frida>=16.0.0",
+    "frida-tools>=12.0.0",
+]
+yara = [
+    "yara-python>=4.3.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+]
+all = [
+    "andoguard[androguard,frida,yara,dev]",
+]
+
+[project.scripts]
+andoguard = "andoguard.cli.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["andoguard"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function call in argument defaults (standard for Typer CLI)
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = [
+    "androguard.*",
+    "frida.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests", "andoguard/tests"]
+addopts = "-ra -q --strict-markers"
+markers = [
+    "device: marks tests requiring a connected Android device or Frida server",
+    "network: marks tests requiring live network access",
+    "slow: marks long-running tests",
+]
