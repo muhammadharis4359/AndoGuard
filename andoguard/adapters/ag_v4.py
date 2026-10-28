@@ -15,7 +15,12 @@ from andoguard.formats.manifest import parse_manifest_element
 from andoguard.models import (
     ApkFileEntry,
     BackendCapabilities,
+    ClassDetail,
+    CodeResult,
+    DisasmResult,
+    FieldInfo,
     ManifestData,
+    MethodInfo,
     ResourceEntry,
     SignatureReport,
     StringItem,
@@ -23,6 +28,7 @@ from andoguard.models import (
     TargetType,
 )
 from andoguard.session.store import compute_file_hashes
+from andoguard.static.cfg import build_cfg_from_basic_blocks
 from andoguard.static.entropy import calculate_shannon_entropy
 
 try:
@@ -302,8 +308,183 @@ class AgV4Adapter(BackendAdapter):
     def _decompile_internal(
         self, class_name: str, method_name: str | None = None
     ) -> str | None:
-        # Androguard 4.x decompiler support
-        return f"// Java decompilation for {class_name} (Dalvik disassembly available)"
+        code_res = self._decompile_source_internal(class_name, method_name, lang="java", cfg=False)
+        return code_res.source
+
+    def get_class_detail(self, class_name: str) -> ClassDetail | None:
+        return self._executor.submit(self._get_class_detail_internal, class_name)
+
+    def _get_class_detail_internal(self, class_name: str) -> ClassDetail | None:
+        if not self._analysis_obj:
+            return None
+        target_cls = None
+        for cls in self._analysis_obj.get_classes():
+            c_name = str(cls.name)
+            if (
+                c_name == class_name
+                or c_name.strip("L;").replace("/", ".") == class_name
+                or c_name == f"L{class_name.replace('.', '/')};"
+            ):
+                target_cls = cls
+                break
+
+        if not target_cls:
+            return None
+
+        vm_cls = target_cls.get_vm_class() if hasattr(target_cls, "get_vm_class") else None
+        super_name = str(vm_cls.get_superclassname()) if vm_cls and hasattr(vm_cls, "get_superclassname") else None
+        interfaces = [str(i) for i in (vm_cls.get_interfaces() if vm_cls and hasattr(vm_cls, "get_interfaces") else [])]
+
+        methods: list[MethodInfo] = []
+        for m in target_cls.get_methods():
+            methods.append(
+                MethodInfo(
+                    name=str(m.name),
+                    descriptor=str(m.descriptor),
+                    access_flags=str(m.get_access_flags_string()) if hasattr(m, "get_access_flags_string") else "",
+                    is_external=bool(m.is_external()) if hasattr(m, "is_external") else False,
+                    class_name=str(target_cls.name),
+                )
+            )
+
+        fields: list[FieldInfo] = []
+        if hasattr(target_cls, "get_fields"):
+            for f in target_cls.get_fields():
+                fields.append(
+                    FieldInfo(
+                        name=str(getattr(f, "name", "unknown")),
+                        descriptor=str(getattr(f, "descriptor", "")),
+                        class_name=str(target_cls.name),
+                    )
+                )
+
+        return ClassDetail(
+            name=str(target_cls.name),
+            super_class=super_name,
+            interfaces=interfaces,
+            access_flags="",
+            methods=methods,
+            fields=fields,
+        )
+
+    def get_fields(self, class_name: str) -> list[str]:
+        detail = self.get_class_detail(class_name)
+        if not detail:
+            return []
+        return [f"{f.name}:{f.descriptor}" for f in detail.fields]
+
+    def disassemble_method(
+        self, class_name: str, method_name: str | None = None, cfg: bool = False
+    ) -> DisasmResult:
+        return self._executor.submit(
+            self._disassemble_method_internal, class_name, method_name, cfg
+        )
+
+    def _disassemble_method_internal(
+        self, class_name: str, method_name: str | None = None, cfg: bool = False
+    ) -> DisasmResult:
+        target_repr = f"{class_name}#{method_name}" if method_name else class_name
+        if not self._analysis_obj:
+            return DisasmResult(target=target_repr, instructions=["// No analysis available."])
+
+        instructions: list[str] = []
+        cfg_obj = None
+
+        for cls in self._analysis_obj.get_classes():
+            c_name = str(cls.name)
+            if (
+                c_name == class_name
+                or c_name.strip("L;").replace("/", ".") == class_name
+                or c_name == f"L{class_name.replace('.', '/')};"
+            ):
+                for method in cls.get_methods():
+                    if method_name and method.name != method_name:
+                        continue
+                    instructions.append(f"; Method {method.name}{method.descriptor}")
+                    encoded = method.get_method()
+                    if encoded and hasattr(encoded, "get_instructions"):
+                        for ins in encoded.get_instructions():
+                            instructions.append(f"    0x{ins.get_op_value():04x}: {ins.get_name()} {ins.get_output()}")
+
+                    if cfg and not cfg_obj and hasattr(method, "get_basic_blocks"):
+                        try:
+                            bbs_obj = method.get_basic_blocks()
+                            bbs = list(bbs_obj.gets()) if hasattr(bbs_obj, "gets") else []
+                            cfg_obj = build_cfg_from_basic_blocks(f"{cls.name}->{method.name}", bbs)
+                        except Exception:
+                            pass
+
+        if not instructions:
+            instructions.append(f"// Target '{target_repr}' not found.")
+
+        return DisasmResult(target=target_repr, instructions=instructions, cfg=cfg_obj)
+
+    def decompile_source(
+        self,
+        class_name: str,
+        method_name: str | None = None,
+        lang: str = "java",
+        cfg: bool = False,
+    ) -> CodeResult:
+        return self._executor.submit(
+            self._decompile_source_internal, class_name, method_name, lang, cfg
+        )
+
+    def _decompile_source_internal(
+        self,
+        class_name: str,
+        method_name: str | None = None,
+        lang: str = "java",
+        cfg: bool = False,
+    ) -> CodeResult:
+        disasm_res = self._disassemble_method_internal(class_name, method_name, cfg=cfg)
+        target_repr = disasm_res.target
+
+        if lang.lower() == "dalvik":
+            return CodeResult(
+                target=target_repr,
+                language="dalvik",
+                source="\n".join(disasm_res.instructions),
+                cfg=disasm_res.cfg,
+            )
+
+        source = None
+        if self._analysis_obj and self._dex_objs:
+            try:
+                from androguard.decompiler.decompiler import DecompilerDAD
+                dad = DecompilerDAD(self._dex_objs[0], self._analysis_obj)
+                for cls in self._analysis_obj.get_classes():
+                    c_name = str(cls.name)
+                    if (
+                        c_name == class_name
+                        or c_name.strip("L;").replace("/", ".") == class_name
+                        or c_name == f"L{class_name.replace('.', '/')};"
+                    ):
+                        if method_name:
+                            for m in cls.get_methods():
+                                if m.name == method_name:
+                                    source = dad.get_source_method(m)
+                                    break
+                        else:
+                            source = dad.get_source_class(cls)
+                        break
+            except Exception:
+                source = None
+
+        if not source:
+            source = (
+                f"// Best-effort Java decompilation for {target_repr}\n"
+                f"// Decompiler DAD unavailable or source reconstruction incomplete.\n"
+                f"// Dalvik bytecode disassembly:\n\n"
+                + "\n".join(disasm_res.instructions)
+            )
+
+        return CodeResult(
+            target=target_repr,
+            language="java",
+            source=source,
+            cfg=disasm_res.cfg,
+        )
 
     def get_strings(self, min_len: int = 4, entropy: bool = False) -> list[str]:
         return self._executor.submit(self._get_strings_internal, min_len, entropy)

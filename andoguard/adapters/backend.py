@@ -12,6 +12,9 @@ from andoguard.errors import BackendError, ConcurrencyError
 from andoguard.models import (
     ApkFileEntry,
     BackendCapabilities,
+    ClassDetail,
+    CodeResult,
+    DisasmResult,
     ManifestData,
     ResourceEntry,
     SignatureReport,
@@ -223,3 +226,28 @@ class BackendAdapter(ABC):
         self, min_len: int = 4, calculate_entropy: bool = False
     ) -> list[StringItem]:
         """Extract string items with length, source, and Shannon entropy."""
+
+    @abstractmethod
+    def get_class_detail(self, class_name: str) -> ClassDetail | None:
+        """Extract detailed class structure with methods, fields, and inheritance."""
+
+    @abstractmethod
+    def get_fields(self, class_name: str) -> list[str]:
+        """List fields declared in a class."""
+
+    @abstractmethod
+    def disassemble_method(
+        self, class_name: str, method_name: str | None = None, cfg: bool = False
+    ) -> DisasmResult:
+        """Disassemble Dalvik bytecode with optional Control Flow Graph."""
+
+    @abstractmethod
+    def decompile_source(
+        self,
+        class_name: str,
+        method_name: str | None = None,
+        lang: str = "java",
+        cfg: bool = False,
+    ) -> CodeResult:
+        """Decompile Dalvik bytecode to Java/Dalvik source with optional CFG."""
+

@@ -13,6 +13,9 @@ from andoguard.errors import (
 from andoguard.models import (
     AnalysisMode,
     ApkFileEntry,
+    ClassDetail,
+    CodeResult,
+    DisasmResult,
     ManifestComponent,
     ManifestData,
     ManifestSecurityFlags,
@@ -178,6 +181,30 @@ class AndoGuard:
     def decompile(self, class_name: str, method_name: str | None = None) -> str | None:
         """Decompile Dalvik bytecode to Java source."""
         return self.backend.decompile(class_name, method_name)
+
+    def class_detail(self, class_name: str) -> ClassDetail | None:
+        """Extract detailed class structure with methods, fields, and inheritance."""
+        return self.backend.get_class_detail(class_name)
+
+    def fields(self, class_name: str) -> list[str]:
+        """List fields declared in a class."""
+        return self.backend.get_fields(class_name)
+
+    def disassemble_method(
+        self, class_name: str, method_name: str | None = None, cfg: bool = False
+    ) -> DisasmResult:
+        """Disassemble Dalvik bytecode with optional Control Flow Graph."""
+        return self.backend.disassemble_method(class_name, method_name, cfg=cfg)
+
+    def decompile_source(
+        self,
+        class_name: str,
+        method_name: str | None = None,
+        lang: str = "java",
+        cfg: bool = False,
+    ) -> CodeResult:
+        """Decompile Dalvik bytecode to Java or Dalvik source with optional CFG."""
+        return self.backend.decompile_source(class_name, method_name, lang=lang, cfg=cfg)
 
     def files(self) -> list[str]:
         """List all entries in the APK archive."""

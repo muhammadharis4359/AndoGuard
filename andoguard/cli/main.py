@@ -11,9 +11,13 @@ from andoguard.cli.commands import (
     open_target,
     resume_session,
     show_certs,
+    show_classes,
+    show_code,
+    show_disasm,
     show_files,
     show_info,
     show_manifest,
+    show_methods,
     show_resources,
     show_strings,
 )
@@ -88,6 +92,22 @@ app.command(
     name="strings",
     help="Extract and analyze string literals from target DEX and resources.",
 )(show_strings)
+app.command(
+    name="classes",
+    help="List and filter classes defined in bytecode.",
+)(show_classes)
+app.command(
+    name="methods",
+    help="List methods defined for a class.",
+)(show_methods)
+app.command(
+    name="disasm",
+    help="Disassemble Dalvik bytecode with optional Control Flow Graph (CFG).",
+)(show_disasm)
+app.command(
+    name="code",
+    help="Decompile Dalvik bytecode to Java or Dalvik source representation.",
+)(show_code)
 
 
 if __name__ == "__main__":

@@ -6,12 +6,15 @@ from collections.abc import Generator
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
 from andoguard.errors import AndoGuardError
 from andoguard.models import (
     ApkFileEntry,
+    CodeResult,
+    DisasmResult,
     ManifestData,
     ResourceEntry,
     SessionRecord,
@@ -432,3 +435,112 @@ def render_strings(strings: list[StringItem], as_json: bool = False) -> None:
         console.print(
             f"[dim]... and {len(strings) - 150} more strings (use --json for complete output).[/dim]"
         )
+
+
+def render_classes(classes: list[str], as_json: bool = False) -> None:
+    """Render list of classes."""
+    if as_json:
+        print(json.dumps(classes, indent=2))
+        return
+
+    if not classes:
+        console.print("[yellow]No classes found.[/yellow]")
+        return
+
+    table = Table(
+        title=f"Classes ({len(classes)})",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Class Name", style="white")
+    for c in classes[:250]:
+        table.add_row(c)
+    console.print(table)
+    if len(classes) > 250:
+        console.print(
+            f"[dim]... and {len(classes) - 250} more classes (use --json for complete list).[/dim]"
+        )
+
+
+def render_methods(methods: list[str], class_name: str, as_json: bool = False) -> None:
+    """Render list of methods for a class."""
+    if as_json:
+        print(json.dumps({"class": class_name, "methods": methods}, indent=2))
+        return
+
+    if not methods:
+        console.print(f"[yellow]No methods found for class {class_name}.[/yellow]")
+        return
+
+    table = Table(
+        title=f"Methods in {class_name} ({len(methods)})",
+        show_header=True,
+        header_style="bold yellow",
+    )
+    table.add_column("Method Signature", style="white")
+    for m in methods:
+        table.add_row(m)
+    console.print(table)
+
+
+def render_disasm(result: DisasmResult, as_json: bool = False) -> None:
+    """Render Dalvik bytecode disassembly."""
+    if as_json:
+        print(json.dumps(result.model_dump(), indent=2))
+        return
+
+    console.print(f"[bold cyan]Disassembly for {result.target}:[/bold cyan]")
+    code_text = "\n".join(result.instructions)
+    syntax = Syntax(code_text, "smali", theme="monokai", line_numbers=True)
+    console.print(syntax)
+
+    if result.cfg:
+        console.print("\n[bold magenta]Control Flow Graph (CFG) Blocks:[/bold magenta]")
+        table = Table(show_header=True, header_style="bold blue")
+        table.add_column("Block", style="cyan")
+        table.add_column("Range", style="dim")
+        table.add_column("Instructions", style="white")
+        table.add_column("Successors", style="green")
+        for b in result.cfg.blocks:
+            ins_summary = f"{len(b.instructions)} insns"
+            table.add_row(
+                b.name,
+                f"0x{b.start:x}-0x{b.end:x}",
+                ins_summary,
+                ", ".join(b.children) or "exit",
+            )
+        console.print(table)
+        console.print("\n[dim]DOT Graph specification:[/dim]")
+        console.print(Syntax(result.cfg.dot, "dot", theme="monokai"))
+
+
+def render_code(result: CodeResult, as_json: bool = False) -> None:
+    """Render decompiled or disassembled code."""
+    if as_json:
+        print(json.dumps(result.model_dump(), indent=2))
+        return
+
+    console.print(
+        f"[bold green]Code ({result.language}) for {result.target}:[/bold green]"
+    )
+    syntax = Syntax(
+        result.source,
+        "java" if result.language.lower() == "java" else "smali",
+        theme="monokai",
+        line_numbers=True,
+    )
+    console.print(syntax)
+
+    if result.cfg:
+        console.print("\n[bold magenta]Control Flow Graph (CFG) Blocks:[/bold magenta]")
+        table = Table(show_header=True, header_style="bold blue")
+        table.add_column("Block", style="cyan")
+        table.add_column("Range", style="dim")
+        table.add_column("Successors", style="green")
+        for b in result.cfg.blocks:
+            table.add_row(
+                b.name, f"0x{b.start:x}-0x{b.end:x}", ", ".join(b.children) or "exit"
+            )
+        console.print(table)
+        console.print("\n[dim]DOT Graph specification:[/dim]")
+        console.print(Syntax(result.cfg.dot, "dot", theme="monokai"))

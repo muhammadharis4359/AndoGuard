@@ -215,3 +215,69 @@ class StringItem(BaseModel):
     length: int
     entropy: float = 0.0
     source: str = "dex"
+
+
+class MethodInfo(BaseModel):
+    """Method descriptor and metadata."""
+
+    name: str
+    descriptor: str
+    access_flags: str = ""
+    is_external: bool = False
+    class_name: str = ""
+
+
+class FieldInfo(BaseModel):
+    """Field descriptor and metadata."""
+
+    name: str
+    descriptor: str
+    access_flags: str = ""
+    class_name: str = ""
+
+
+class ClassDetail(BaseModel):
+    """Detailed class information with methods, fields, and inheritance."""
+
+    name: str
+    super_class: str | None = None
+    interfaces: list[str] = Field(default_factory=list)
+    access_flags: str = ""
+    methods: list[MethodInfo] = Field(default_factory=list)
+    fields: list[FieldInfo] = Field(default_factory=list)
+
+
+class BasicBlockInfo(BaseModel):
+    """Control flow graph basic block."""
+
+    name: str
+    start: int = 0
+    end: int = 0
+    instructions: list[str] = Field(default_factory=list)
+    children: list[str] = Field(default_factory=list)
+
+
+class ControlFlowGraph(BaseModel):
+    """Method Control Flow Graph (CFG)."""
+
+    method: str
+    blocks: list[BasicBlockInfo] = Field(default_factory=list)
+    dot: str = ""
+
+
+class DisasmResult(BaseModel):
+    """Dalvik disassembly output with optional CFG."""
+
+    target: str
+    instructions: list[str] = Field(default_factory=list)
+    cfg: ControlFlowGraph | None = None
+
+
+class CodeResult(BaseModel):
+    """Decompiled or disassembled source code representation."""
+
+    target: str
+    language: str = "java"  # "java" or "dalvik"
+    source: str
+    cfg: ControlFlowGraph | None = None
+

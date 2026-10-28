@@ -19,6 +19,9 @@ from andoguard.formats.manifest import parse_manifest_element
 from andoguard.models import (
     ApkFileEntry,
     BackendCapabilities,
+    ClassDetail,
+    CodeResult,
+    DisasmResult,
     ManifestData,
     ResourceEntry,
     SignatureReport,
@@ -336,6 +339,37 @@ class FallbackAdapter(BackendAdapter):
 
     def decompile(self, class_name: str, method_name: str | None = None) -> str | None:
         return "// Decompilation unavailable in built-in fallback mode."
+
+    def get_class_detail(self, class_name: str) -> ClassDetail | None:
+        return None
+
+    def get_fields(self, class_name: str) -> list[str]:
+        return []
+
+    def disassemble_method(
+        self, class_name: str, method_name: str | None = None, cfg: bool = False
+    ) -> DisasmResult:
+        target_repr = f"{class_name}#{method_name}" if method_name else class_name
+        return DisasmResult(
+            target=target_repr,
+            instructions=["// Disassembly unavailable in built-in fallback mode."],
+            cfg=None,
+        )
+
+    def decompile_source(
+        self,
+        class_name: str,
+        method_name: str | None = None,
+        lang: str = "java",
+        cfg: bool = False,
+    ) -> CodeResult:
+        target_repr = f"{class_name}#{method_name}" if method_name else class_name
+        return CodeResult(
+            target=target_repr,
+            language=lang,
+            source="// Decompilation unavailable in built-in fallback mode.",
+            cfg=None,
+        )
 
     def get_strings(self, min_len: int = 4, entropy: bool = False) -> list[str]:
         return [item.value for item in self.get_string_items(min_len, entropy)]
