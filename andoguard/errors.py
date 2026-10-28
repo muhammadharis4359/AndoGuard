@@ -146,3 +146,37 @@ class HookError(DynamicInstrumentationError):
             remediation="Review hook script syntax, class/method names, and parameters.",
         )
 
+
+class AiError(AndoGuardError):
+    """Base exception for AI reasoning and LLM provider failures."""
+
+
+class AiProviderUnavailableError(AiError):
+    """Raised when the specified AI provider is not reachable or unconfigured."""
+
+    def __init__(self, provider: str, details: str = "Missing API key or host unreachable.") -> None:
+        super().__init__(
+            message=f"AI provider '{provider}' is not available: {details}",
+            remediation="Set appropriate environment variable (e.g. GEMINI_API_KEY, OPENAI_API_KEY) or check service status.",
+        )
+
+
+class AiAuthenticationError(AiError):
+    """Raised when AI provider rejects credentials."""
+
+    def __init__(self, provider: str) -> None:
+        super().__init__(
+            message=f"Authentication failed for AI provider '{provider}'.",
+            remediation="Verify API key or token validity.",
+        )
+
+
+class AiRateLimitError(AiError):
+    """Raised when AI provider rate limit is exceeded."""
+
+    def __init__(self, provider: str) -> None:
+        super().__init__(
+            message=f"Rate limit exceeded for AI provider '{provider}'.",
+            remediation="Wait before retrying or use a provider with higher quotas.",
+        )
+

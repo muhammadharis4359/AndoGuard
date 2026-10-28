@@ -7,6 +7,7 @@ from rich.console import Console
 
 from andoguard import __version__
 from andoguard.cli.commands import (
+    ai_app,
     dynamic_app,
     list_sessions,
     open_target,
@@ -140,6 +141,7 @@ app.command(
     help="Compare active session target against another APK or session.",
 )(show_diff)
 app.add_typer(dynamic_app, name="dynamic")
+app.add_typer(ai_app, name="ai")
 
 
 if __name__ == "__main__":

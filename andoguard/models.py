@@ -277,6 +277,11 @@ class DisasmResult(BaseModel):
     instructions: list[str] = Field(default_factory=list)
     cfg: ControlFlowGraph | None = None
 
+    @property
+    def smali_code(self) -> str:
+        """Formatted instructions as smali string."""
+        return "\n".join(self.instructions)
+
 
 class CodeResult(BaseModel):
     """Decompiled or disassembled source code representation."""
@@ -285,6 +290,11 @@ class CodeResult(BaseModel):
     language: str = "java"  # "java" or "dalvik"
     source: str
     cfg: ControlFlowGraph | None = None
+
+    @property
+    def source_code(self) -> str:
+        """Alias for source."""
+        return self.source
 
 
 class XrefItem(BaseModel):
@@ -344,6 +354,11 @@ class VulnerabilityFinding(BaseModel):
     description: str
     remediation: str
     location: str = ""
+
+    @property
+    def evidence(self) -> str:
+        """Alias for description."""
+        return self.description
 
 
 class VulnerabilityReport(BaseModel):

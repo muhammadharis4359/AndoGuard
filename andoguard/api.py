@@ -5,6 +5,13 @@ from typing import Any
 
 from andoguard.adapters.backend import BackendAdapter
 from andoguard.adapters.detect import create_backend
+from andoguard.ai.cache import AiCacheManager
+from andoguard.ai.prompts import (
+    build_ask_prompt,
+    build_explain_prompt,
+    build_triage_prompt,
+)
+from andoguard.ai.provider import get_ai_provider
 from andoguard.config import AndoGuardConfig
 from andoguard.dynamic.bypasses import generate_combined_bypass
 from andoguard.dynamic.generator import (
@@ -502,6 +509,85 @@ class AndoGuard:
         return self.session_store.save_hook(
             sid, class_name, method_name, script, status=status
         )
+
+    def ai_ask(
+        self,
+        question: str,
+        context: str | None = None,
+        provider: str | None = None,
+    ) -> str:
+        """Query AI reasoning provider with context."""
+        cache = AiCacheManager(self.session_store.config)
+        p = get_ai_provider(provider, config=self.session_store.config)
+        system, prompt = build_ask_prompt(question, context=context)
+        cache_key = cache.compute_hash(p.name, p.model, prompt, system=system)
+        hit = cache.get(cache_key)
+        if hit is not None:
+            return hit
+        resp = p.generate(prompt, system=system)
+        cache.put(cache_key, p.name, p.model, resp)
+        return resp
+
+    def ai_explain(
+        self,
+        class_or_method: str,
+        provider: str | None = None,
+    ) -> str:
+        """Explain and de-obfuscate class or method using AI."""
+        code = ""
+        try:
+            res = self.decompile_source(class_or_method)
+            code = res.source
+        except Exception:
+            try:
+                dis = self.disassemble_method(class_or_method)
+                code = "\n".join(dis.instructions)
+            except Exception:
+                code = f"// Target: {class_or_method}"
+
+        cache = AiCacheManager(self.session_store.config)
+        p = get_ai_provider(provider, config=self.session_store.config)
+        system, prompt = build_explain_prompt(code, identifier=class_or_method)
+        cache_key = cache.compute_hash(p.name, p.model, prompt, system=system)
+        hit = cache.get(cache_key)
+        if hit is not None:
+            return hit
+        resp = p.generate(prompt, system=system)
+        cache.put(cache_key, p.name, p.model, resp)
+        return resp
+
+    def ai_triage(
+        self,
+        provider: str | None = None,
+    ) -> str:
+        """Perform automated AI security triage across all static vulnerabilities."""
+        report = self.vulns()
+        findings_data = [
+            {
+                "title": f.title,
+                "severity": f.severity.value,
+                "masvs_id": f.masvs_id,
+                "evidence": f.evidence,
+            }
+            for f in report.findings
+        ]
+        sec_flags = self.manifest.security_flags()
+        manifest_summary = (
+            f"Package: {self.target_info.package_name}, "
+            f"Debuggable: {sec_flags.debuggable}, "
+            f"AllowBackup: {sec_flags.allow_backup}, "
+            f"Exported: {len(self.manifest.exported_components())} components"
+        )
+        cache = AiCacheManager(self.session_store.config)
+        p = get_ai_provider(provider, config=self.session_store.config)
+        system, prompt = build_triage_prompt(findings_data, manifest_summary)
+        cache_key = cache.compute_hash(p.name, p.model, prompt, system=system)
+        hit = cache.get(cache_key)
+        if hit is not None:
+            return hit
+        resp = p.generate(prompt, system=system)
+        cache.put(cache_key, p.name, p.model, resp)
+        return resp
 
     def close(self) -> None:
         """Release open file handles and shutdown backend workers."""

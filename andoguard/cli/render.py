@@ -3,8 +3,10 @@
 import contextlib
 import json
 from collections.abc import Generator
+from typing import Any
 
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
@@ -876,5 +878,42 @@ def render_trace_events(events: list[TraceEvent], as_json: bool = False) -> None
             details = f"args: {e.args}, ret: {e.return_val}"
         table.add_row(e.timestamp[:19], type_styled, target, details)
     console.print(table)
+
+
+def render_ai_doctor(providers: list[dict[str, Any]], as_json: bool = False) -> None:
+    """Render health status of configured AI providers."""
+    if as_json:
+        print(json.dumps(providers, indent=2))
+        return
+
+    table = Table(
+        title="AI Providers Healthcheck",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Provider", style="bold white", width=12)
+    table.add_column("Model", style="yellow", width=28)
+    table.add_column("Default", justify="center", width=8)
+    table.add_column("Status / Health", style="white")
+
+    for p in providers:
+        default_str = (
+            "[bold green]YES[/bold green]" if p.get("is_default") else "[dim]NO[/dim]"
+        )
+        status_str = (
+            f"[bold green]{p['status']}[/bold green]"
+            if p.get("available")
+            else f"[red]{p['status']}[/red]"
+        )
+        table.add_row(p["name"].upper(), p["model"], default_str, status_str)
+    console.print(table)
+
+
+def render_ai_panel(content: str, title: str = "AI Analysis") -> None:
+    """Render Markdown content inside a stylized Rich panel."""
+    md = Markdown(content)
+    console.print(
+        Panel(md, title=f"[bold cyan]{title}[/bold cyan]", border_style="cyan")
+    )
 
 

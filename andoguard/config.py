@@ -21,6 +21,14 @@ class AndoGuardConfig(BaseModel):
     no_color: bool = False
     json_output: bool = False
     active_session_id: str | None = None
+    default_ai_provider: str = "gemini"
+    gemini_model: str = "gemini-1.5-flash"
+    openai_model: str = "gpt-4o-mini"
+    openai_base_url: str = "https://api.openai.com/v1"
+    anthropic_model: str = "claude-3-5-sonnet-20241022"
+    ollama_model: str = "llama3"
+    ollama_base_url: str = "http://localhost:11434"
+    ai_cache_enabled: bool = True
 
     @classmethod
     def load(cls, config_path: Path | None = None) -> "AndoGuardConfig":
@@ -46,6 +54,10 @@ class AndoGuardConfig(BaseModel):
         if mode_env and mode_env in {m.value for m in AnalysisMode}:
             data["default_mode"] = AnalysisMode(mode_env)
 
+        ai_provider_env = os.environ.get("ANDOGUARD_AI_PROVIDER")
+        if ai_provider_env:
+            data["default_ai_provider"] = ai_provider_env
+
         config = cls(**data)
         config.ensure_directories()
         return config
@@ -61,6 +73,7 @@ class AndoGuardConfig(BaseModel):
             "no_color": self.no_color,
             "json_output": self.json_output,
             "active_session_id": self.active_session_id,
+            "default_ai_provider": self.default_ai_provider,
         }
         with open(cfg_file, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)

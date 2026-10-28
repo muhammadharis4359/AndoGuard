@@ -1,5 +1,4 @@
-"""CLI subcommand implementations for AndoGuard."""
-
+from andoguard.cli.commands.ai_cmd import ai_app
 from andoguard.cli.commands.certs_cmd import show_certs
 from andoguard.cli.commands.classes_cmd import show_classes
 from andoguard.cli.commands.code_cmd import show_code
@@ -40,5 +39,6 @@ __all__ = [
     "show_vulns",
     "show_native",
     "show_diff",
+    "ai_app",
     "dynamic_app",
 ]
