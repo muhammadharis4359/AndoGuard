@@ -52,3 +52,5 @@ htmlcov/
 # AndoGuard local data & sessions
 .andoguard/
 *.agguard
+samples/
+*.apk
