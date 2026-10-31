@@ -42,6 +42,10 @@ andoguard open sample.apk
 andoguard info
 andoguard info --json
 
+# Launch modern interactive web dashboard for security audit & presentation
+andoguard dashboard
+andoguard dashboard samples/insecure_bank.apk --port 8080
+
 # List active and past sessions
 andoguard sessions
 

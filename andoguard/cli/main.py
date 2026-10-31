@@ -9,6 +9,7 @@ from andoguard import __version__
 from andoguard.cli.commands import (
     adaptive_app,
     ai_app,
+    dashboard_cmd,
     dynamic_app,
     export_bundle_cmd,
     generate_report_cmd,
@@ -75,6 +76,10 @@ app.command(
     name="open",
     help="Open an Android binary, start/link a session, and inspect target.",
 )(open_target)
+app.command(
+    name="dashboard",
+    help="Launch interactive modern web dashboard for presentation and analysis.",
+)(dashboard_cmd)
 app.command(
     name="info", help="Display metadata for the active or selected session target."
 )(show_info)

@@ -4,6 +4,7 @@ from andoguard.cli.commands.bundle_cmd import export_bundle_cmd, import_bundle_c
 from andoguard.cli.commands.certs_cmd import show_certs
 from andoguard.cli.commands.classes_cmd import show_classes
 from andoguard.cli.commands.code_cmd import show_code
+from andoguard.cli.commands.dashboard_cmd import dashboard_cmd
 from andoguard.cli.commands.diff_cmd import show_diff
 from andoguard.cli.commands.disasm_cmd import show_disasm
 from andoguard.cli.commands.dynamic_cmd import dynamic_app
@@ -24,6 +25,7 @@ from andoguard.cli.commands.xrefs_cmd import show_xrefs
 
 __all__ = [
     "open_target",
+    "dashboard_cmd",
     "show_info",
     "list_sessions",
     "resume_session",

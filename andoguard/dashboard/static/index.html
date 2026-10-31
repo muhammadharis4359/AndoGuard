@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AndoGuard — Modern Autonomous Android Reverse Engineering & Security Assessment Dashboard">
+  <title>AndoGuard — Android Security Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <!-- Header Bar -->
+  <header class="navbar" id="mainHeader">
+    <a href="#" class="nav-brand" id="brandLink">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+        </svg>
+      </div>
+      <span>AndoGuard</span>
+      <span class="nav-tag">v0.1.0 Production</span>
+    </a>
+
+    <div class="nav-controls">
+      <div class="target-select-wrap">
+        <label for="targetSelect">Target:</label>
+        <select id="targetSelect" class="target-select" title="Switch active target APK">
+          <option value="insecure_bank.apk">insecure_bank.apk (Vulnerable Showcase)</option>
+          <option value="demo.apk">demo.apk (Minimal Baseline)</option>
+        </select>
+      </div>
+
+      <div class="engine-pill" id="engineStatusPill" title="Thread-safe WAL backend active">
+        <span class="pulse-dot"></span>
+        <span id="engineStatusText">Androguard v4 (Thread-Safe WAL)</span>
+      </div>
+
+      <button class="btn btn-academic" id="presentationModeBtn" title="Toggle Academic Presentation Deck">
+        <span>🎓</span>
+        <span>Presentation Deck</span>
+      </button>
+
+      <button class="btn btn-secondary" id="uploadModalOpenBtn" title="Upload new APK file">
+        <span>⬆️ Upload APK</span>
+      </button>
+
+      <button class="btn btn-primary" id="exportBtn" title="Download Audit Report">
+        <span>📑 Export Audit Report</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- App Body Layout -->
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar" id="sidebarNav" aria-label="Main Navigation">
+      <div class="sidebar-heading">Security Overview</div>
+      <a class="nav-item active" data-tab="tab-overview" id="nav-overview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Executive Overview</span>
+      </a>
+      <a class="nav-item" data-tab="tab-vulns" id="nav-vulns">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>OWASP Vulnerabilities</span>
+        <span class="nav-badge" id="vulnsCountBadge">12</span>
+      </a>
+      <a class="nav-item" data-tab="tab-manifest" id="nav-manifest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span>Manifest & Components</span>
+      </a>
+      <a class="nav-item" data-tab="tab-permissions" id="nav-permissions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>Permissions Matrix</span>
+      </a>
+
+      <div class="sidebar-heading">Static & Binary Analysis</div>
+      <a class="nav-item" data-tab="tab-secrets" id="nav-secrets">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Secrets & Entropy</span>
+        <span class="nav-badge warning" id="secretsCountBadge">9</span>
+      </a>
+      <a class="nav-item" data-tab="tab-studio" id="nav-studio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <span>Decompiler Studio</span>
+      </a>
+      <a class="nav-item" data-tab="tab-native" id="nav-native">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        <span>Native Binaries (.so)</span>
+      </a>
+      <a class="nav-item" data-tab="tab-certs" id="nav-certs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <span>Certificates & Keystore</span>
+      </a>
+
+      <div class="sidebar-heading">Dynamic & AI Assist</div>
+      <a class="nav-item" data-tab="tab-frida" id="nav-frida">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span>Dynamic Frida Studio</span>
+      </a>
+      <a class="nav-item" data-tab="tab-ai" id="nav-ai">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        <span>AI Security Co-Pilot</span>
+      </a>
+
+      <div class="sidebar-heading">Academic Presentation</div>
+      <a class="nav-item" data-tab="tab-presentation" id="nav-presentation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+        <span>Professor Deck & Theory</span>
+      </a>
+      <a class="nav-item" data-tab="tab-sessions" id="nav-sessions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        <span>Session Store (WAL)</span>
+      </a>
+    </nav>
+
+    <!-- Main Dynamic Content -->
+    <main class="main-content" id="mainContent">
+
+      <!-- Target Banner -->
+      <section class="target-banner" id="targetBanner">
+        <div class="target-title-block">
+          <h1>
+            <span id="targetPackageTitle">com.andoguard.insecurebank</span>
+            <span class="nav-tag" id="targetVersionTag">v2.1.0</span>
+          </h1>
+          <div class="target-meta-row">
+            <div class="target-meta-item">Target File: <code id="metaTargetFileName">insecure_bank.apk</code></div>
+            <div class="target-meta-item">Min / Target SDK: <code id="metaSdkRange">API 24 -> 33</code></div>
+            <div class="target-meta-item">SHA-256: <code id="metaSha256">597f234d08...</code></div>
+            <div class="target-meta-item">Size: <span id="metaFileSize">4.8 KB</span></div>
+            <div class="target-meta-item">Session: <code id="metaSessionId">c43a6aeb</code></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 1: EXECUTIVE OVERVIEW -->
+      <section class="tab-pane active" id="tab-overview">
+        <div class="overview-grid">
+          <!-- Radial Security Score -->
+          <div class="score-card">
+            <div class="metric-header" style="width: 100%;">
+              <span>Security Posture Score</span>
+              <span class="nav-tag">MASVS Audit</span>
+            </div>
+            <div class="radial-container">
+              <svg class="radial-svg" viewBox="0 0 140 140">
+                <circle class="radial-bg" cx="70" cy="70" r="58"/>
+                <circle class="radial-progress" id="scoreRadialCircle" cx="70" cy="70" r="58"/>
+              </svg>
+              <div class="score-text">
+                <span class="score-number" id="securityScoreNumber">28</span>
+                <span class="score-label">/ 100 PTS</span>
+              </div>
+            </div>
+            <div class="grade-badge" id="riskGradeBadge">GRADE: D (HIGH RISK)</div>
+            <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 8px;">
+              Heuristic deduction based on OWASP MASVS Critical/High vulnerabilities
+            </p>
+          </div>
+
+          <!-- Key Metrics Grid -->
+          <div class="metrics-summary-grid">
+            <div class="metric-card">
+              <div class="metric-header">
+                <span>Critical Vulnerabilities</span>
+                <div class="metric-icon danger">⚠️</div>
+              </div>
+              <div class="metric-value" id="cardCriticalCount" style="color: var(--danger);">2</div>
+              <div class="metric-sub">Immediate exploitability</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span>High Severity Issues</span>
+                <div class="metric-icon warning">🛡️</div>
+              </div>
+              <div class="metric-value" id="cardHighCount" style="color: var(--warning);">6</div>
+              <div class="metric-sub">Broken crypto & exposed components</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span>Exported Components</span>
+                <div class="metric-icon danger">⚡</div>
+              </div>
+              <div class="metric-value" id="cardExportedCount">6</div>
+              <div class="metric-sub">Unprotected attack surface</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span>Discovered Secrets</span>
+                <div class="metric-icon warning">🔑</div>
+              </div>
+              <div class="metric-value" id="cardSecretsCount">9</div>
+              <div class="metric-sub">AWS, Google API, JWT, High-Entropy</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span>Permissions Declared</span>
+                <div class="metric-icon info">📜</div>
+              </div>
+              <div class="metric-value" id="cardPermissionsCount">7</div>
+              <div class="metric-sub">SMS, Audio, Location, Contacts</div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-header">
+                <span>Native ELF Binaries</span>
+                <div class="metric-icon success">⚙️</div>
+              </div>
+              <div class="metric-value" id="cardNativeCount">2</div>
+              <div class="metric-sub">arm64-v8a, x86_64 architectures</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Security Flags & OWASP Compliance Radar -->
+        <div class="cards-row">
+          <!-- Manifest Flags -->
+          <div class="panel-card">
+            <h2>
+              <span>Security Manifest Flags</span>
+              <span class="nav-tag">Android Security Model</span>
+            </h2>
+            <div class="flags-list" id="manifestFlagsList">
+              <div class="flag-item">
+                <div class="flag-info">
+                  <div class="flag-name">android:debuggable</div>
+                  <div class="flag-desc">Allows JDWP runtime debugger connection and memory extraction</div>
+                </div>
+                <span class="status-badge danger" id="flagDebuggable">ENABLED (VULNERABLE)</span>
+              </div>
+              <div class="flag-item">
+                <div class="flag-info">
+                  <div class="flag-name">android:usesCleartextTraffic</div>
+                  <div class="flag-desc">Permits unencrypted HTTP communications vulnerable to MitM</div>
+                </div>
+                <span class="status-badge danger" id="flagCleartext">ALLOWED (VULNERABLE)</span>
+              </div>
+              <div class="flag-item">
+                <div class="flag-info">
+                  <div class="flag-name">android:allowBackup</div>
+                  <div class="flag-desc">Permits full adb backup extraction of private SQLite DBs & Prefs</div>
+                </div>
+                <span class="status-badge danger" id="flagBackup">ALLOWED (RISK)</span>
+              </div>
+              <div class="flag-item">
+                <div class="flag-info">
+                  <div class="flag-name">Network Security Config</div>
+                  <div class="flag-desc">Custom domain certificate pinning and cleartext traffic controls</div>
+                </div>
+                <span class="status-badge danger" id="flagNetConfig">NOT CONFIGURED</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- OWASP MASVS Coverage -->
+          <div class="panel-card">
+            <h2>
+              <span>OWASP MASVS / MASTG Compliance</span>
+              <span class="nav-tag">Mobile Standard</span>
+            </h2>
+            <div class="masvs-list" id="masvsCoverageList">
+              <div class="masvs-item">
+                <div class="masvs-header">
+                  <span>MASVS-STORAGE (Data Protection at Rest)</span>
+                  <span style="color: var(--warning);">FAIL (allowBackup=true)</span>
+                </div>
+                <div class="masvs-bar-track"><div class="masvs-bar-fill" style="width: 35%; background: var(--warning);"></div></div>
+              </div>
+              <div class="masvs-item">
+                <div class="masvs-header">
+                  <span>MASVS-CRYPTO (Cryptography & Key Handling)</span>
+                  <span style="color: var(--danger);">CRITICAL (DES/ECB & MD5)</span>
+                </div>
+                <div class="masvs-bar-track"><div class="masvs-bar-fill" style="width: 20%; background: var(--danger);"></div></div>
+              </div>
+              <div class="masvs-item">
+                <div class="masvs-header">
+                  <span>MASVS-NETWORK (Network Communication)</span>
+                  <span style="color: var(--danger);">FAIL (Cleartext & TrustAll)</span>
+                </div>
+                <div class="masvs-bar-track"><div class="masvs-bar-fill" style="width: 25%; background: var(--danger);"></div></div>
+              </div>
+              <div class="masvs-item">
+                <div class="masvs-header">
+                  <span>MASVS-PLATFORM (IPC & Exposed Components)</span>
+                  <span style="color: var(--danger);">FAIL (6 Exported Unprotected)</span>
+                </div>
+                <div class="masvs-bar-track"><div class="masvs-bar-fill" style="width: 15%; background: var(--danger);"></div></div>
+              </div>
+              <div class="masvs-item">
+                <div class="masvs-header">
+                  <span>MASVS-CODE (Code Quality & Build Flags)</span>
+                  <span style="color: var(--danger);">FAIL (debuggable=true)</span>
+                </div>
+                <div class="masvs-bar-track"><div class="masvs-bar-fill" style="width: 30%; background: var(--danger);"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: VULNERABILITIES -->
+      <section class="tab-pane" id="tab-vulns">
+        <div class="filter-bar">
+          <div class="filter-pills">
+            <button class="filter-btn active" data-filter="all">All Findings</button>
+            <button class="filter-btn" data-filter="CRITICAL">Critical</button>
+            <button class="filter-btn" data-filter="HIGH">High</button>
+            <button class="filter-btn" data-filter="MEDIUM">Medium</button>
+          </div>
+          <input type="text" id="vulnSearchInput" class="search-input" placeholder="🔍 Search vulnerability or MASVS ID...">
+        </div>
+        <div class="findings-container" id="findingsContainer">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- TAB 3: MANIFEST & COMPONENTS -->
+      <section class="tab-pane" id="tab-manifest">
+        <div class="filter-bar">
+          <div class="filter-pills">
+            <button class="filter-btn active" data-comp-filter="all">All Components</button>
+            <button class="filter-btn" data-comp-filter="activity">Activities</button>
+            <button class="filter-btn" data-comp-filter="service">Services</button>
+            <button class="filter-btn" data-comp-filter="receiver">Broadcast Receivers</button>
+            <button class="filter-btn" data-comp-filter="provider">Content Providers</button>
+            <button class="filter-btn" data-comp-filter="xml">Raw AndroidManifest.xml</button>
+          </div>
+        </div>
+
+        <div id="componentsContainer" class="findings-container">
+          <!-- Populated by JS -->
+        </div>
+
+        <div id="manifestXmlContainer" style="display: none;">
+          <div class="studio-editor-container" style="height: 600px;">
+            <div class="editor-header">
+              <span>AndroidManifest.xml (Decoded AXML Tree)</span>
+              <button class="btn btn-secondary" id="copyXmlBtn" style="padding: 4px 10px; font-size: 0.75rem;">Copy XML</button>
+            </div>
+            <div class="code-wrapper">
+              <pre><code id="rawXmlCodeBlock">Loading XML...</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: PERMISSIONS MATRIX -->
+      <section class="tab-pane" id="tab-permissions">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Permission Name</th>
+                <th>Risk Classification</th>
+                <th>Security & Privacy Impact</th>
+                <th>Associated MASVS Category</th>
+              </tr>
+            </thead>
+            <tbody id="permissionsTableBody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 5: SECRETS & ENTROPY -->
+      <section class="tab-pane" id="tab-secrets">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Secret Type</th>
+                <th>Discovered Key / Token Value</th>
+                <th>Shannon Entropy</th>
+                <th>Provenance & Source File</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="secretsTableBody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 6: DECOMPILER STUDIO -->
+      <section class="tab-pane" id="tab-studio">
+        <div class="studio-layout">
+          <!-- Class Browser Sidebar -->
+          <div class="studio-sidebar">
+            <input type="text" id="classSearchInput" class="search-input class-search" placeholder="🔍 Filter classes...">
+            <div class="class-list" id="classListContainer">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Code View Area -->
+          <div class="studio-editor-container">
+            <div class="editor-header">
+              <div class="editor-tabs">
+                <button class="editor-tab-btn active" data-lang="java" id="tabBtnJava">Java Decompiled Source</button>
+                <button class="editor-tab-btn" data-lang="dalvik" id="tabBtnDalvik">Dalvik Smali Bytecode</button>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary" id="copyCodeBtn" style="padding: 4px 10px; font-size: 0.75rem;">Copy Code</button>
+              </div>
+            </div>
+            <div class="code-wrapper">
+              <pre><code id="codeSourceDisplay">Select a class from the left browser to inspect decompiled source.</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 7: NATIVE BINARIES -->
+      <section class="tab-pane" id="tab-native">
+        <div class="cards-row" id="nativeLibsContainer">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- TAB 8: CERTIFICATES & KEYSTORE -->
+      <section class="tab-pane" id="tab-certs">
+        <div class="panel-card" id="certsCard">
+          <h2>
+            <span>APK Signature Verification (v1, v2, v3)</span>
+            <span class="nav-tag">Android Signing Scheme</span>
+          </h2>
+          <div id="certsContentContainer">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 9: DYNAMIC FRIDA STUDIO -->
+      <section class="tab-pane" id="tab-frida">
+        <div class="cards-row">
+          <div class="panel-card">
+            <h2>
+              <span>Dynamic Script Synthesizer</span>
+              <span class="nav-tag">Frida Instrumentation</span>
+            </h2>
+            <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 12px;">
+              <div>
+                <label style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Hook Template Preset:</label>
+                <select id="fridaHookSelect" class="search-input" style="width: 100%; margin-top: 6px;">
+                  <option value="ssl_bypass">SSL Pinning Bypass (OkHttp, TrustManager, NetworkSecurityConfig)</option>
+                  <option value="root_bypass">Root & Integrity Detection Bypass (RootBeer, SU binaries, test-keys)</option>
+                  <option value="all_bypasses">Full Unified Bypass (SSL + Root + Debugger + Emulator)</option>
+                  <option value="method_hook">Java Method Call & Argument Tracer</option>
+                </select>
+              </div>
+
+              <div id="methodHookInputs" style="display: none; display: flex; flex-direction: column; gap: 8px;">
+                <input type="text" id="hookClassInput" class="search-input" style="width: 100%;" placeholder="Target Class (e.g. com.andoguard.insecurebank.AuthManager)">
+                <input type="text" id="hookMethodInput" class="search-input" style="width: 100%;" placeholder="Target Method (e.g. decryptAuthToken)">
+              </div>
+
+              <button class="btn btn-primary" id="generateScriptBtn">⚡ Generate Frida Script</button>
+            </div>
+          </div>
+
+          <div class="studio-editor-container" style="height: 500px;">
+            <div class="editor-header">
+              <span>Frida JavaScript Hook Output</span>
+              <button class="btn btn-secondary" id="copyFridaScriptBtn" style="padding: 4px 10px; font-size: 0.75rem;">Copy Script</button>
+            </div>
+            <div class="code-wrapper">
+              <pre><code id="fridaScriptCode">Click "Generate Frida Script" to produce runtime instrumentation hooks.</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 10: AI SECURITY CO-PILOT -->
+      <section class="tab-pane" id="tab-ai">
+        <div class="chat-window">
+          <div class="chat-history" id="chatHistory">
+            <div class="chat-message bot">
+              <div class="chat-avatar">AI</div>
+              <div class="chat-bubble">
+                Hello! I am your <strong>AndoGuard Security Co-Pilot</strong>. I have indexed the active target <code>com.andoguard.insecurebank</code> across all decompiled DEX classes, native ELF headers, and OWASP MASVS compliance findings. Ask me to triage vulnerabilities, explain bytecode logic, or generate an executive briefing for your professor!
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-chips">
+            <button class="chip-btn" data-prompt="Generate an executive summary for my professor">🎓 Executive Professor Briefing</button>
+            <button class="chip-btn" data-prompt="Explain vulnerability VULN-DEBUG-001 and remediation">⚠️ Explain Debuggable Exploit</button>
+            <button class="chip-btn" data-prompt="How do I exploit the exported TransferActivity?">⚡ How to trigger TransferActivity</button>
+            <button class="chip-btn" data-prompt="Analyze the cryptographic implementation in AuthManager">🔐 Analyze AuthManager Crypto</button>
+          </div>
+
+          <div class="chat-input-bar">
+            <input type="text" id="chatInput" class="search-input" style="flex: 1;" placeholder="Ask AndoGuard AI a question about this APK's security posture...">
+            <button class="btn btn-primary" id="chatSendBtn">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 11: ACADEMIC PRESENTATION DECK -->
+      <section class="tab-pane" id="tab-presentation">
+        <div class="presentation-container">
+          <!-- Slide 1 -->
+          <article class="slide-card">
+            <span class="slide-badge">SLIDE 1 — PROJECT MISSION & IDENTITY</span>
+            <h3>AndoGuard: Production-Grade Android Binary Analysis & Auditing Framework</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.6;">
+              A library-first, offline-first security assessment platform designed for authorized reverse engineering, compliance verification against OWASP MASVS, and runtime instrumentation.
+            </p>
+            <div class="deck-grid">
+              <div class="deck-item">
+                <h4>🎯 Problem Statement</h4>
+                <p>Modern Android reverse engineering toolchains suffer from brittle cloud dependencies, lack of thread safety in analysis data structures, and fragmented static/dynamic tooling.</p>
+              </div>
+              <div class="deck-item">
+                <h4>💡 Solution Architecture</h4>
+                <p>Clean hexagonal architecture with an abstract backend adapter layer, single-worker thread queue (<code>BackendExecutor</code>), and deterministic SQLite WAL session persistence.</p>
+              </div>
+              <div class="deck-item">
+                <h4>📐 Standard Alignment</h4>
+                <p>Automated static auditing rigorously mapped to the official OWASP Mobile Application Security Verification Standard (MASVS v2.0).</p>
+              </div>
+            </div>
+          </article>
+
+          <!-- Slide 2 -->
+          <article class="slide-card">
+            <span class="slide-badge">SLIDE 2 — TECHNICAL METHODOLOGY & ADAPTER LAYER</span>
+            <h3>Engine Architecture: Dual-Backend & Thread Concurrency</h3>
+            <div class="deck-grid">
+              <div class="deck-item">
+                <h4>Thread-Safe Execution</h4>
+                <p>Androguard parsing structures are notoriously thread-affine. AndoGuard routes all analysis queries through a dedicated <code>BackendExecutor</code> task queue, preventing race conditions.</p>
+              </div>
+              <div class="deck-item">
+                <h4>Multi-Engine Adapter</h4>
+                <p>Dynamic detection layer supporting Androguard 4.x and 5.x with automatic fallback to pure-Python parsers for AXML, ARSC, DEX, and X.509 certificates.</p>
+              </div>
+              <div class="deck-item">
+                <h4>Shannon Entropy Math</h4>
+                <p>High-entropy token harvesting calculates character frequency distributions: <code>H(X) = -sum(p(x) * log2(p(x)))</code> with a 3.8 cutoff for secret discovery.</p>
+              </div>
+            </div>
+          </article>
+
+          <!-- Slide 3 -->
+          <article class="slide-card">
+            <span class="slide-badge">SLIDE 3 — LIVE DEMONSTRATION WORKFLOW</span>
+            <h3>Evaluation Walkthrough for Academic Defense</h3>
+            <div class="deck-grid">
+              <div class="deck-item">
+                <h4>Step 1: Manifest Triage</h4>
+                <p>Demonstrate detection of <code>debuggable="true"</code>, <code>allowBackup="true"</code>, and exported <code>TransferActivity</code>.</p>
+              </div>
+              <div class="deck-item">
+                <h4>Step 2: Cryptographic Audit</h4>
+                <p>Inspect decompiled <code>AuthManager.java</code> to observe broken <code>DES/ECB</code> cipher and hardcoded AWS credentials.</p>
+              </div>
+              <div class="deck-item">
+                <h4>Step 3: Dynamic Synthesis</h4>
+                <p>Generate unified Frida hook scripts to bypass SSL certificate pinning and simulate exploitation.</p>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- TAB 12: SQLITE SESSIONS -->
+      <section class="tab-pane" id="tab-sessions">
+        <div class="panel-card">
+          <h2>
+            <span>Persistent Session Database (SQLite WAL)</span>
+            <span class="nav-tag">Resumable Sessions</span>
+          </h2>
+          <div class="table-container" style="margin-top: 14px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Session ID</th>
+                  <th>Session Name</th>
+                  <th>Target Hash (SHA-256)</th>
+                  <th>Analysis Mode</th>
+                  <th>Created At</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="sessionsTableBody">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Upload Modal Dialog -->
+  <dialog id="uploadModal">
+    <div class="modal-header">
+      <h3 style="color: #fff; font-size: 1.1rem;">Upload Target Android Binary</h3>
+      <button class="btn btn-secondary" id="closeUploadModalBtn" style="padding: 2px 8px;">✕</button>
+    </div>
+    <div class="drop-zone" id="dropZone">
+      <div style="font-size: 2rem; margin-bottom: 8px;">📦</div>
+      <div style="font-weight: 600; color: #fff;">Drag & Drop APK or DEX here</div>
+      <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 4px;">or click to select file from disk</div>
+      <input type="file" id="fileInput" accept=".apk,.dex" style="display: none;">
+    </div>
+  </dialog>
+
+  <!-- Report Export Modal Dialog -->
+  <dialog id="exportModal">
+    <div class="modal-header">
+      <h3 style="color: #fff; font-size: 1.1rem;">Export Security Assessment Report</h3>
+      <button class="btn btn-secondary" id="closeExportModalBtn" style="padding: 2px 8px;">✕</button>
+    </div>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 18px;">
+      Generate a verified security assessment report formatted for academic submission or professional audit deliverable:
+    </p>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <a class="btn btn-primary" id="downloadHtmlReportBtn" href="/api/export?format=html" download>
+        <span>🌐 Download Interactive HTML Report</span>
+      </a>
+      <a class="btn btn-secondary" id="downloadMdReportBtn" href="/api/export?format=markdown" download>
+        <span>📝 Download GitHub-Flavored Markdown Report</span>
+      </a>
+      <a class="btn btn-secondary" id="downloadJsonReportBtn" href="/api/export?format=json" download>
+        <span>📊 Download Machine-Readable JSON Report</span>
+      </a>
+    </div>
+  </dialog>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
