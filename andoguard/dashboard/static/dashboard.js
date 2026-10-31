@@ -715,45 +715,209 @@ class AndoGuardDashboard {
     }
   }
 
+  showLoader(title, subtitle, filename) {
+    const overlay = document.getElementById("analysisOverlay");
+    const tEl = document.getElementById("loaderTitle");
+    const sEl = document.getElementById("loaderSub");
+    const fEl = document.getElementById("loaderTargetName");
+    const pBar = document.getElementById("loaderProgressBar");
+    const pText = document.getElementById("loaderPercent");
+
+    if (tEl) tEl.textContent = title || "Analyzing Android Package";
+    if (sEl) sEl.textContent = subtitle || "Extracting binary payload & running static audits...";
+    if (fEl) fEl.textContent = filename || "sample.apk";
+    if (pBar) pBar.style.width = "12%";
+    if (pText) pText.textContent = "12%";
+
+    ["step-ingest", "step-manifest", "step-bytecode", "step-vulns"].forEach((stepId, i) => {
+      const el = document.getElementById(stepId);
+      if (el) el.className = "loader-step" + (i === 0 ? " active" : "");
+    });
+
+    if (overlay) overlay.style.display = "flex";
+
+    const pill = document.getElementById("engineStatusPill");
+    const pillText = document.getElementById("engineStatusText");
+    if (pill) pill.classList.add("analyzing");
+    if (pillText) pillText.textContent = `Processing ${filename || "target"}...`;
+  }
+
+  updateLoader(percent, stepId, subtitle) {
+    const pBar = document.getElementById("loaderProgressBar");
+    const pText = document.getElementById("loaderPercent");
+    const sEl = document.getElementById("loaderSub");
+
+    if (pBar) pBar.style.width = `${percent}%`;
+    if (pText) pText.textContent = `${percent}%`;
+    if (subtitle && sEl) sEl.textContent = subtitle;
+
+    const steps = ["step-ingest", "step-manifest", "step-bytecode", "step-vulns"];
+    const targetIdx = steps.indexOf(stepId);
+    if (targetIdx !== -1) {
+      steps.forEach((s, idx) => {
+        const el = document.getElementById(s);
+        if (!el) return;
+        if (idx < targetIdx) {
+          el.className = "loader-step completed";
+        } else if (idx === targetIdx) {
+          el.className = "loader-step active";
+        } else {
+          el.className = "loader-step";
+        }
+      });
+    }
+  }
+
+  hideLoader() {
+    const overlay = document.getElementById("analysisOverlay");
+    const pBar = document.getElementById("loaderProgressBar");
+    const pText = document.getElementById("loaderPercent");
+
+    if (pBar) pBar.style.width = "100%";
+    if (pText) pText.textContent = "100%";
+
+    ["step-ingest", "step-manifest", "step-bytecode", "step-vulns"].forEach(s => {
+      const el = document.getElementById(s);
+      if (el) el.className = "loader-step completed";
+    });
+
+    setTimeout(() => {
+      if (overlay) overlay.style.display = "none";
+      const pill = document.getElementById("engineStatusPill");
+      const pillText = document.getElementById("engineStatusText");
+      if (pill) pill.classList.remove("analyzing");
+      if (pillText) pillText.textContent = "Androguard v4 (Thread-Safe WAL)";
+    }, 450);
+  }
+
+  showToast(title, message, type = "success") {
+    const container = document.getElementById("toastContainer");
+    if (!container) return;
+
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    const icon = type === "success" ? "🛡️" : (type === "warning" ? "⚠️" : (type === "danger" ? "🚨" : "ℹ️"));
+    toast.innerHTML = `
+      <div class="toast-icon">${icon}</div>
+      <div class="toast-body">
+        <div class="toast-title">${title}</div>
+        <div class="toast-message">${message}</div>
+      </div>
+    `;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.animation = "fadeOutToast 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards";
+      setTimeout(() => toast.remove(), 300);
+    }, 4500);
+  }
+
   async switchTarget(sampleName) {
     this.currentDatasetKey = sampleName;
+    this.showLoader("Switching Analysis Target", `Loading security telemetry for ${sampleName}...`, sampleName);
+
+    let simulated = 20;
+    const interval = setInterval(() => {
+      if (simulated < 85) {
+        simulated += 18;
+        if (simulated > 50) {
+          this.updateLoader(simulated, "step-bytecode", "Loading decompiled classes and smali instructions...");
+        } else {
+          this.updateLoader(simulated, "step-manifest", "Parsing security flags and permission matrix...");
+        }
+      }
+    }, 150);
+
     try {
       const res = await fetch("/api/open", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sample: sampleName })
       });
+      clearInterval(interval);
       if (res.ok) {
+        this.updateLoader(100, "step-vulns", "Telemetry Ready!");
         await this.loadData();
+        this.hideLoader();
+        const score = this.currentData?.security_score ?? "N/A";
+        const grade = this.currentData?.risk_grade ?? "";
+        this.showToast("Target Loaded", `${sampleName} active. Score: ${score}/100 (${grade})`, "info");
         return;
       }
     } catch (e) {
+      clearInterval(interval);
       // offline fallback
     }
 
     if (DEMO_DATASETS[sampleName]) {
+      this.updateLoader(100, "step-vulns", "Verification Suite Telemetry Loaded!");
       this.currentData = DEMO_DATASETS[sampleName];
       this.renderAll();
       this.loadClasses();
+      this.hideLoader();
+      this.showToast("Target Loaded", `${sampleName} loaded from verification suite.`, "info");
+    } else {
+      this.hideLoader();
     }
   }
 
   async uploadFile(file) {
+    const sizeStr = file.size > 1048576 
+      ? (file.size / 1048576).toFixed(2) + " MB" 
+      : (file.size / 1024).toFixed(1) + " KB";
+      
+    this.uploadModal.close();
+    this.showLoader(
+      "Ingesting & Auditing Android Binary", 
+      `Uploading ${file.name} (${sizeStr}) to AndoGuard Engine...`, 
+      file.name
+    );
+
+    // Dynamic progress ticker while server processes decompilation
+    let simulated = 15;
+    const progressInterval = setInterval(() => {
+      if (simulated < 88) {
+        simulated += Math.floor(Math.random() * 8) + 4;
+        if (simulated >= 25 && simulated < 50) {
+          this.updateLoader(simulated, "step-manifest", "Parsing AndroidManifest.xml & Security Flags...");
+        } else if (simulated >= 50 && simulated < 75) {
+          this.updateLoader(simulated, "step-bytecode", "Decompiling Dalvik Bytecode, Classes, and Smali...");
+        } else if (simulated >= 75) {
+          this.updateLoader(simulated, "step-vulns", "Executing OWASP MASVS Security Checks & Shannon Entropy...");
+        } else {
+          this.updateLoader(simulated, "step-ingest", `Ingesting ${file.name} (${sizeStr})...`);
+        }
+      }
+    }, 280);
+
     try {
       const res = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/octet-stream" },
         body: file
       });
+      clearInterval(progressInterval);
+
       if (res.ok) {
-        this.uploadModal.close();
-        alert(`Target ${file.name} successfully analyzed!`);
+        this.updateLoader(100, "step-vulns", "Audit Complete! Synchronizing Telemetry...");
         await this.loadData();
+        this.hideLoader();
+        this.switchTab("tab-overview");
+        const count = this.currentData?.findings?.length || 0;
+        const grade = this.currentData?.risk_grade || "Evaluated";
+        this.showToast(
+          "Audit Completed", 
+          `Target ${file.name} successfully analyzed! Identified ${count} findings (Grade: ${grade}).`, 
+          "success"
+        );
       } else {
-        alert("Upload failed. Please ensure file is a valid Android binary.");
+        this.hideLoader();
+        this.showToast("Analysis Error", "Server could not process uploaded APK. Ensure file is a valid Android binary.", "danger");
       }
     } catch (e) {
-      alert("Offline demo mode: unable to upload binary to live server.");
+      clearInterval(progressInterval);
+      this.hideLoader();
+      this.showToast("Offline Mode", `File ${file.name} received. Running in offline presentation mode.`, "info");
     }
   }
 

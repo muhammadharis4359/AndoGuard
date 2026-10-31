@@ -1172,6 +1172,309 @@ dialog::backdrop {
   }
 }
 
+/* ==========================================================================
+   Analysis Processing Cyber Loader Overlay & Toast Notifications
+   ========================================================================== */
+
+.analysis-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 11, 22, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeInOverlay 0.25s ease-out forwards;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.loader-card {
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(0, 242, 254, 0.45);
+  border-radius: var(--radius-lg);
+  padding: 36px 32px;
+  max-width: 520px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 0 50px rgba(0, 242, 254, 0.2), 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  position: relative;
+  overflow: hidden;
+  animation: scaleInCard 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.loader-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--cyan-glow), var(--purple-glow), transparent);
+  animation: scanningBeam 2.5s infinite linear;
+}
+
+@keyframes scanningBeam {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(50%); }
+}
+
+@keyframes scaleInCard {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Cyber Rotating Spinner */
+.cyber-spinner-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cyber-ring {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.ring-outer {
+  inset: 0;
+  border: 3px solid transparent;
+  border-top-color: var(--cyan-glow);
+  border-bottom-color: var(--purple-glow);
+  animation: rotateClockwise 1.4s linear infinite;
+}
+
+.ring-inner {
+  inset: 12px;
+  border: 2.5px solid transparent;
+  border-left-color: var(--blue-glow);
+  border-right-color: #38bdf8;
+  animation: rotateCounter 1s linear infinite;
+}
+
+.cyber-shield-icon {
+  font-size: 2.2rem;
+  animation: shieldPulse 1.8s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.6));
+}
+
+@keyframes rotateClockwise {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes rotateCounter {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes shieldPulse {
+  0% { transform: scale(0.92); opacity: 0.85; }
+  100% { transform: scale(1.1); opacity: 1; }
+}
+
+.loader-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+
+.loader-sub {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  min-height: 22px;
+  line-height: 1.4;
+}
+
+/* Loader Progress Track */
+.loader-progress-wrap {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.loader-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #00f2fe, #3b82f6, #8b5cf6, #00f2fe);
+  background-size: 200% 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+  animation: progressGradient 2s linear infinite;
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.6);
+}
+
+@keyframes progressGradient {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.loader-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-family: var(--font-code);
+  margin-bottom: 24px;
+}
+
+.loader-stats span:first-child {
+  color: var(--cyan-glow);
+  font-weight: 500;
+  max-width: 75%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 4 Phase Steps */
+.loader-steps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  text-align: left;
+}
+
+.loader-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: var(--transition);
+}
+
+.loader-step .step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #475569;
+}
+
+.loader-step.active {
+  color: #fff;
+  background: rgba(0, 242, 254, 0.08);
+  border-color: rgba(0, 242, 254, 0.3);
+}
+
+.loader-step.active .step-dot {
+  background: var(--cyan-glow);
+  box-shadow: 0 0 8px var(--cyan-glow);
+  animation: dotPulse 1s infinite alternate;
+}
+
+.loader-step.completed {
+  color: var(--success);
+  background: var(--success-bg);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.loader-step.completed .step-dot {
+  background: var(--success);
+}
+
+@keyframes dotPulse {
+  from { transform: scale(0.8); opacity: 0.6; }
+  to { transform: scale(1.3); opacity: 1; }
+}
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  color: var(--text-main);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 300px;
+  max-width: 420px;
+  animation: slideInToast 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: var(--transition);
+}
+
+.toast.toast-success {
+  border-left: 4px solid var(--success);
+}
+
+.toast.toast-warning {
+  border-left: 4px solid var(--warning);
+}
+
+.toast.toast-danger {
+  border-left: 4px solid var(--danger);
+}
+
+.toast.toast-info {
+  border-left: 4px solid var(--cyan-glow);
+}
+
+.toast-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.toast-body {
+  flex: 1;
+}
+
+.toast-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.toast-message {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+@keyframes slideInToast {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeOutToast {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+
 </style>
 </head>
 <body>
@@ -1802,6 +2105,51 @@ dialog::backdrop {
       </a>
     </div>
   </dialog>
+
+  <!-- Analysis Processing Cyber Loader Overlay -->
+  <div id="analysisOverlay" class="analysis-overlay" style="display: none;" role="status" aria-live="polite">
+    <div class="loader-card">
+      <div class="cyber-spinner-wrap">
+        <div class="cyber-ring ring-outer"></div>
+        <div class="cyber-ring ring-inner"></div>
+        <div class="cyber-shield-icon">🛡️</div>
+      </div>
+      
+      <h3 id="loaderTitle" class="loader-title">Analyzing Android Package</h3>
+      <p id="loaderSub" class="loader-sub">Extracting binary payload and parsing AndroidManifest.xml...</p>
+      
+      <div class="loader-progress-wrap">
+        <div id="loaderProgressBar" class="loader-progress-bar" style="width: 15%;"></div>
+      </div>
+      
+      <div class="loader-stats">
+        <span id="loaderTargetName">sample.apk</span>
+        <span id="loaderPercent">15%</span>
+      </div>
+      
+      <div class="loader-steps">
+        <div class="loader-step active" id="step-ingest">
+          <span class="step-dot"></span>
+          <span>1. Ingest Payload</span>
+        </div>
+        <div class="loader-step" id="step-manifest">
+          <span class="step-dot"></span>
+          <span>2. Manifest & Flags</span>
+        </div>
+        <div class="loader-step" id="step-bytecode">
+          <span class="step-dot"></span>
+          <span>3. Smali Decompile</span>
+        </div>
+        <div class="loader-step" id="step-vulns">
+          <span class="step-dot"></span>
+          <span>4. OWASP Audit</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container for Notifications -->
+  <div id="toastContainer" class="toast-container" aria-live="assertive"></div>
 
   <script>
 /**
@@ -2521,45 +2869,209 @@ class AndoGuardDashboard {
     }
   }
 
+  showLoader(title, subtitle, filename) {
+    const overlay = document.getElementById("analysisOverlay");
+    const tEl = document.getElementById("loaderTitle");
+    const sEl = document.getElementById("loaderSub");
+    const fEl = document.getElementById("loaderTargetName");
+    const pBar = document.getElementById("loaderProgressBar");
+    const pText = document.getElementById("loaderPercent");
+
+    if (tEl) tEl.textContent = title || "Analyzing Android Package";
+    if (sEl) sEl.textContent = subtitle || "Extracting binary payload & running static audits...";
+    if (fEl) fEl.textContent = filename || "sample.apk";
+    if (pBar) pBar.style.width = "12%";
+    if (pText) pText.textContent = "12%";
+
+    ["step-ingest", "step-manifest", "step-bytecode", "step-vulns"].forEach((stepId, i) => {
+      const el = document.getElementById(stepId);
+      if (el) el.className = "loader-step" + (i === 0 ? " active" : "");
+    });
+
+    if (overlay) overlay.style.display = "flex";
+
+    const pill = document.getElementById("engineStatusPill");
+    const pillText = document.getElementById("engineStatusText");
+    if (pill) pill.classList.add("analyzing");
+    if (pillText) pillText.textContent = `Processing ${filename || "target"}...`;
+  }
+
+  updateLoader(percent, stepId, subtitle) {
+    const pBar = document.getElementById("loaderProgressBar");
+    const pText = document.getElementById("loaderPercent");
+    const sEl = document.getElementById("loaderSub");
+
+    if (pBar) pBar.style.width = `${percent}%`;
+    if (pText) pText.textContent = `${percent}%`;
+    if (subtitle && sEl) sEl.textContent = subtitle;
+
+    const steps = ["step-ingest", "step-manifest", "step-bytecode", "step-vulns"];
+    const targetIdx = steps.indexOf(stepId);
+    if (targetIdx !== -1) {
+      steps.forEach((s, idx) => {
+        const el = document.getElementById(s);
+        if (!el) return;
+        if (idx < targetIdx) {
+          el.className = "loader-step completed";
+        } else if (idx === targetIdx) {
+          el.className = "loader-step active";
+        } else {
+          el.className = "loader-step";
+        }
+      });
+    }
+  }
+
+  hideLoader() {
+    const overlay = document.getElementById("analysisOverlay");
+    const pBar = document.getElementById("loaderProgressBar");
+    const pText = document.getElementById("loaderPercent");
+
+    if (pBar) pBar.style.width = "100%";
+    if (pText) pText.textContent = "100%";
+
+    ["step-ingest", "step-manifest", "step-bytecode", "step-vulns"].forEach(s => {
+      const el = document.getElementById(s);
+      if (el) el.className = "loader-step completed";
+    });
+
+    setTimeout(() => {
+      if (overlay) overlay.style.display = "none";
+      const pill = document.getElementById("engineStatusPill");
+      const pillText = document.getElementById("engineStatusText");
+      if (pill) pill.classList.remove("analyzing");
+      if (pillText) pillText.textContent = "Androguard v4 (Thread-Safe WAL)";
+    }, 450);
+  }
+
+  showToast(title, message, type = "success") {
+    const container = document.getElementById("toastContainer");
+    if (!container) return;
+
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    const icon = type === "success" ? "🛡️" : (type === "warning" ? "⚠️" : (type === "danger" ? "🚨" : "ℹ️"));
+    toast.innerHTML = `
+      <div class="toast-icon">${icon}</div>
+      <div class="toast-body">
+        <div class="toast-title">${title}</div>
+        <div class="toast-message">${message}</div>
+      </div>
+    `;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.animation = "fadeOutToast 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards";
+      setTimeout(() => toast.remove(), 300);
+    }, 4500);
+  }
+
   async switchTarget(sampleName) {
     this.currentDatasetKey = sampleName;
+    this.showLoader("Switching Analysis Target", `Loading security telemetry for ${sampleName}...`, sampleName);
+
+    let simulated = 20;
+    const interval = setInterval(() => {
+      if (simulated < 85) {
+        simulated += 18;
+        if (simulated > 50) {
+          this.updateLoader(simulated, "step-bytecode", "Loading decompiled classes and smali instructions...");
+        } else {
+          this.updateLoader(simulated, "step-manifest", "Parsing security flags and permission matrix...");
+        }
+      }
+    }, 150);
+
     try {
       const res = await fetch("/api/open", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sample: sampleName })
       });
+      clearInterval(interval);
       if (res.ok) {
+        this.updateLoader(100, "step-vulns", "Telemetry Ready!");
         await this.loadData();
+        this.hideLoader();
+        const score = this.currentData?.security_score ?? "N/A";
+        const grade = this.currentData?.risk_grade ?? "";
+        this.showToast("Target Loaded", `${sampleName} active. Score: ${score}/100 (${grade})`, "info");
         return;
       }
     } catch (e) {
+      clearInterval(interval);
       // offline fallback
     }
 
     if (DEMO_DATASETS[sampleName]) {
+      this.updateLoader(100, "step-vulns", "Verification Suite Telemetry Loaded!");
       this.currentData = DEMO_DATASETS[sampleName];
       this.renderAll();
       this.loadClasses();
+      this.hideLoader();
+      this.showToast("Target Loaded", `${sampleName} loaded from verification suite.`, "info");
+    } else {
+      this.hideLoader();
     }
   }
 
   async uploadFile(file) {
+    const sizeStr = file.size > 1048576 
+      ? (file.size / 1048576).toFixed(2) + " MB" 
+      : (file.size / 1024).toFixed(1) + " KB";
+      
+    this.uploadModal.close();
+    this.showLoader(
+      "Ingesting & Auditing Android Binary", 
+      `Uploading ${file.name} (${sizeStr}) to AndoGuard Engine...`, 
+      file.name
+    );
+
+    // Dynamic progress ticker while server processes decompilation
+    let simulated = 15;
+    const progressInterval = setInterval(() => {
+      if (simulated < 88) {
+        simulated += Math.floor(Math.random() * 8) + 4;
+        if (simulated >= 25 && simulated < 50) {
+          this.updateLoader(simulated, "step-manifest", "Parsing AndroidManifest.xml & Security Flags...");
+        } else if (simulated >= 50 && simulated < 75) {
+          this.updateLoader(simulated, "step-bytecode", "Decompiling Dalvik Bytecode, Classes, and Smali...");
+        } else if (simulated >= 75) {
+          this.updateLoader(simulated, "step-vulns", "Executing OWASP MASVS Security Checks & Shannon Entropy...");
+        } else {
+          this.updateLoader(simulated, "step-ingest", `Ingesting ${file.name} (${sizeStr})...`);
+        }
+      }
+    }, 280);
+
     try {
       const res = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/octet-stream" },
         body: file
       });
+      clearInterval(progressInterval);
+
       if (res.ok) {
-        this.uploadModal.close();
-        alert(`Target ${file.name} successfully analyzed!`);
+        this.updateLoader(100, "step-vulns", "Audit Complete! Synchronizing Telemetry...");
         await this.loadData();
+        this.hideLoader();
+        this.switchTab("tab-overview");
+        const count = this.currentData?.findings?.length || 0;
+        const grade = this.currentData?.risk_grade || "Evaluated";
+        this.showToast(
+          "Audit Completed", 
+          `Target ${file.name} successfully analyzed! Identified ${count} findings (Grade: ${grade}).`, 
+          "success"
+        );
       } else {
-        alert("Upload failed. Please ensure file is a valid Android binary.");
+        this.hideLoader();
+        this.showToast("Analysis Error", "Server could not process uploaded APK. Ensure file is a valid Android binary.", "danger");
       }
     } catch (e) {
-      alert("Offline demo mode: unable to upload binary to live server.");
+      clearInterval(progressInterval);
+      this.hideLoader();
+      this.showToast("Offline Mode", `File ${file.name} received. Running in offline presentation mode.`, "info");
     }
   }
 

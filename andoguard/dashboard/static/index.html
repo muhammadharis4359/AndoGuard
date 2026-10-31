@@ -639,6 +639,51 @@
     </div>
   </dialog>
 
+  <!-- Analysis Processing Cyber Loader Overlay -->
+  <div id="analysisOverlay" class="analysis-overlay" style="display: none;" role="status" aria-live="polite">
+    <div class="loader-card">
+      <div class="cyber-spinner-wrap">
+        <div class="cyber-ring ring-outer"></div>
+        <div class="cyber-ring ring-inner"></div>
+        <div class="cyber-shield-icon">🛡️</div>
+      </div>
+      
+      <h3 id="loaderTitle" class="loader-title">Analyzing Android Package</h3>
+      <p id="loaderSub" class="loader-sub">Extracting binary payload and parsing AndroidManifest.xml...</p>
+      
+      <div class="loader-progress-wrap">
+        <div id="loaderProgressBar" class="loader-progress-bar" style="width: 15%;"></div>
+      </div>
+      
+      <div class="loader-stats">
+        <span id="loaderTargetName">sample.apk</span>
+        <span id="loaderPercent">15%</span>
+      </div>
+      
+      <div class="loader-steps">
+        <div class="loader-step active" id="step-ingest">
+          <span class="step-dot"></span>
+          <span>1. Ingest Payload</span>
+        </div>
+        <div class="loader-step" id="step-manifest">
+          <span class="step-dot"></span>
+          <span>2. Manifest & Flags</span>
+        </div>
+        <div class="loader-step" id="step-bytecode">
+          <span class="step-dot"></span>
+          <span>3. Smali Decompile</span>
+        </div>
+        <div class="loader-step" id="step-vulns">
+          <span class="step-dot"></span>
+          <span>4. OWASP Audit</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container for Notifications -->
+  <div id="toastContainer" class="toast-container" aria-live="assertive"></div>
+
   <script src="dashboard.js"></script>
 </body>
 </html>
