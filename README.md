@@ -71,6 +71,12 @@ print(f"SHA-256: {info.sha256}")
 ag.close()
 ```
 
+## 👨‍💻 Project Lead & Architect
+
+**DarkPulseX (Muhammad Haris)**
+- Project Architecture, Reverse Engineering Engine & Modern Dashboard Suite
+- Aligned with OWASP Mobile Application Security Verification Standard (MASVS v2.0)
+
 ## License
 
 Apache-2.0

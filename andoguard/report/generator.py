@@ -80,6 +80,7 @@ def build_report_data(ag: "AndoGuard") -> dict[str, Any]:
             "version_code": t_info.version_code,
             "min_sdk": t_info.min_sdk_version,
             "target_sdk": t_info.target_sdk_version,
+            "architect": "DarkPulseX (Muhammad Haris)",
         },
         "security_flags": {
             "debuggable": sec_flags.debuggable,
@@ -160,6 +161,7 @@ def generate_markdown_report(ag: "AndoGuard") -> str:
         "",
         "> **Notice**: Generated for authorized reverse engineering and penetration testing.",
         "",
+        "- **Project Architect**: **DarkPulseX (Muhammad Haris)**",
         f"- **Session ID**: `{meta['session_id']}`",
         f"- **Assessment Date**: `{meta['generated_at'][:19]} UTC`",
         f"- **Target File**: `{meta['target_path']}`",
@@ -480,6 +482,7 @@ def generate_html_report(ag: "AndoGuard") -> str:
 
         <div class="footer">
             <p>AndoGuard &bull; Authorized Android Reverse Engineering & Security Testing Toolkit</p>
+            <p style="margin-top: 6px; font-size: 0.82rem; color: #94a3b8;">Architected & Developed by <strong style="color: #06b6d4;">DarkPulseX (Muhammad Haris)</strong> &bull; OWASP MASVS Aligned</p>
         </div>
     </div>
 </body>
